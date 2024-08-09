@@ -1,0 +1,275 @@
+package main
+
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"net"
+	"os"
+	"pinger/proc"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/vishvananda/netns"
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/sys/unix"
+	"inet.af/netaddr"
+	"k8s.io/klog/v2"
+)
+
+const (
+	pingReplyPollTimeout = 10 * time.Millisecond
+	protocolICMP         = 1 // Internet Control Message
+)
+
+var (
+	pingerID = os.Getpid() & 0xFFFF
+)
+
+type sentPacket struct {
+	seq         int
+	txTimestamp time.Time
+}
+
+func Ping(ns netns.NsHandle, originNs netns.NsHandle, targets []netaddr.IP, timeout time.Duration) (map[netaddr.IP]float64, error) {
+	if len(targets) < 1 {
+		return nil, nil
+	}
+	var conn *net.IPConn
+	err := proc.ExecuteInNetNs(ns, originNs, func() error {
+		c, err := openConn()
+		if err != nil {
+			return err
+		}
+		conn = c
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open IPConn: %s", err)
+	}
+	defer conn.Close()
+	f, err := conn.File()
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	fd := int(f.Fd())
+
+	ids := make(map[netaddr.IP]*sentPacket, len(targets))
+	for seq, ip := range targets {
+		nowTime := time.Now()
+		pkt := &sentPacket{seq: seq + 1, txTimestamp: nowTime}
+		if err := send(conn, pkt.seq, ip.IPAddr()); err != nil {
+			if strings.HasPrefix(err.Error(), "resource temporarily unavailable") {
+				continue
+			}
+			return nil, fmt.Errorf("failed to send packet to %s: %s", ip, err)
+		}
+		if !Kernel317 {
+			if pkt.txTimestamp, err = getTxTimestamp(fd); err != nil {
+				if strings.HasPrefix(err.Error(), "resource temporarily unavailable") {
+					continue
+				}
+				return nil, fmt.Errorf("failed to get TX timestamp: %s", err)
+			}
+		} else {
+			pkt.txTimestamp = nowTime
+		}
+		ids[ip] = pkt
+	}
+
+	timeoutTicker := time.NewTimer(timeout)
+	defer timeoutTicker.Stop()
+
+	rttByIp := make(map[netaddr.IP]float64, len(targets))
+	for {
+		select {
+		case <-timeoutTicker.C:
+			return rttByIp, nil
+		default:
+			if len(rttByIp) == len(targets) {
+				return rttByIp, nil
+			}
+			remoteAddr, echoReply, rxTimestamp, err := receive(conn)
+			if err != nil {
+				if !strings.Contains(err.Error(), "interrupted system call") { // recvmsg timeout is not an issue
+					klog.Errorln(err)
+				}
+				continue
+			}
+			if echoReply == nil {
+				continue
+			}
+			if echoReply.ID != pingerID {
+				continue
+			}
+			ip, ok := netaddr.FromStdIP(remoteAddr.IP)
+			if !ok {
+				continue
+			}
+			if pkt, ok := ids[ip]; ok && pkt.seq == echoReply.Seq {
+				rtt := rxTimestamp.Sub(pkt.txTimestamp).Seconds()
+				if rtt < 0 { // a small negative value is possible if the clock has adjusted by ntpd
+					rtt = 0
+				}
+				rttByIp[ip] = rtt
+			}
+		}
+	}
+}
+
+func send(conn *net.IPConn, seq int, ip net.Addr) error {
+	msg := &icmp.Message{
+		Type: ipv4.ICMPTypeEcho,
+		Body: &icmp.Echo{
+			ID:  pingerID,
+			Seq: seq,
+		},
+	}
+	data, err := msg.Marshal(nil)
+	if err != nil {
+		return err
+	}
+	_, err = conn.WriteTo(data, ip)
+	return err
+}
+
+func getTimestampFromOutOfBandData(oob []byte, oobn int) (time.Time, error) {
+	cms, err := syscall.ParseSocketControlMessage(oob[:oobn])
+	if err != nil {
+		return time.Time{}, err
+	}
+	for _, cm := range cms {
+		if cm.Header.Level == syscall.SOL_SOCKET || cm.Header.Type == syscall.SO_TIMESTAMPING {
+			var t unix.ScmTimestamping
+			if err := binary.Read(bytes.NewBuffer(cm.Data), binary.LittleEndian, &t); err != nil {
+				return time.Time{}, err
+			}
+			return time.Unix(t.Ts[0].Unix()), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("no timestamp found")
+}
+func getTimestampFromOutOfBandDataKernel317(oob []byte, oobn int) (time.Time, error) {
+	cms, err := syscall.ParseSocketControlMessage(oob[:oobn])
+	if err != nil {
+		return time.Time{}, err
+	}
+	for _, cm := range cms {
+		if cm.Header.Level == unix.SOL_SOCKET && (cm.Header.Type == unix.SO_TIMESTAMP || cm.Header.Type == unix.SO_TIMESTAMPNS) {
+			var t unix.Timeval
+			if err := binary.Read(bytes.NewBuffer(cm.Data), binary.LittleEndian, &t); err != nil {
+				return time.Time{}, err
+			}
+			return time.Unix(int64(t.Sec), int64(t.Usec)*1000), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("no timestamp found")
+}
+
+func getTxTimestamp(socketFd int) (time.Time, error) {
+	pktBuf := make([]byte, 1024)
+	oob := make([]byte, 1024)
+	var t time.Time
+	_, oobn, _, _, err := syscall.Recvmsg(socketFd, pktBuf, oob, syscall.MSG_ERRQUEUE)
+	if err != nil {
+		return t, err
+	}
+	if !Kernel317 {
+		return getTimestampFromOutOfBandData(oob, oobn)
+	} else {
+		return getTimestampFromOutOfBandDataKernel317(oob, oobn)
+	}
+}
+
+func receive(conn *net.IPConn) (*net.IPAddr, *icmp.Echo, time.Time, error) {
+	pktBuf := make([]byte, 1024)
+	oob := make([]byte, 1024)
+	var ts time.Time
+
+	_ = conn.SetReadDeadline(time.Now().Add(pingReplyPollTimeout))
+	n, oobn, _, ra, err := conn.ReadMsgIP(pktBuf, oob)
+	if err != nil {
+		if neterr, ok := err.(*net.OpError); ok && neterr.Timeout() {
+			return nil, nil, ts, nil
+		}
+		if strings.Contains(err.Error(), "no message of desired type") {
+			return nil, nil, ts, nil
+		}
+		return nil, nil, ts, err
+	}
+
+	if !Kernel317 {
+		if ts, err = getTimestampFromOutOfBandData(oob, oobn); err != nil {
+			return nil, nil, ts, fmt.Errorf("failed to get RX timestamp: %s", err)
+		}
+	} else {
+		if ts, err = getTimestampFromOutOfBandDataKernel317(oob, oobn); err != nil {
+			return nil, nil, ts, fmt.Errorf("failed to get RX timestamp: %s", err)
+		}
+	}
+
+	echo, err := extractEchoFromPacket(pktBuf, n)
+	if err != nil {
+		return nil, nil, ts, fmt.Errorf("failed to extract ICMP Echo from IPv4 packet %s: %s", ra, err)
+	}
+	return ra, echo, ts, nil
+}
+
+func extractEchoFromPacket(pktBuf []byte, n int) (*icmp.Echo, error) {
+	if n < ipv4.HeaderLen {
+		return nil, errors.New("malformed IPv4 packet")
+	}
+	pktBuf = pktBuf[ipv4.HeaderLen:]
+	var m *icmp.Message
+	m, err := icmp.ParseMessage(protocolICMP, pktBuf)
+	if err != nil {
+		return nil, err
+	}
+	if m.Type != ipv4.ICMPTypeEchoReply {
+		return nil, nil
+	}
+	echo, ok := m.Body.(*icmp.Echo)
+	if !ok {
+		return nil, fmt.Errorf("malformed ICMP message body: %T", m.Body)
+	}
+	return echo, nil
+}
+
+func openConn() (*net.IPConn, error) {
+	conn, err := net.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return nil, err
+	}
+	ipconn := conn.(*net.IPConn)
+	f, err := ipconn.File()
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	fd := int(f.Fd())
+	if !Kernel317 {
+		flags := unix.SOF_TIMESTAMPING_SOFTWARE | unix.SOF_TIMESTAMPING_RX_SOFTWARE | unix.SOF_TIMESTAMPING_TX_SCHED |
+			unix.SOF_TIMESTAMPING_OPT_CMSG | unix.SOF_TIMESTAMPING_OPT_TSONLY
+		if err := syscall.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_TIMESTAMPING, flags); err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+	} else {
+		if err := syscall.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_TIMESTAMP, 1); err != nil {
+			return nil, err
+		}
+	}
+
+	timeout := syscall.Timeval{Sec: 0, Usec: 1000}
+	if err := syscall.SetsockoptTimeval(fd, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &timeout); err != nil {
+		return nil, err
+	}
+	if err := syscall.SetsockoptTimeval(fd, unix.SOL_SOCKET, unix.SO_SNDTIMEO, &timeout); err != nil {
+		return nil, err
+	}
+	return ipconn, nil
+}
