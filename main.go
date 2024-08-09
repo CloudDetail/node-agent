@@ -6,12 +6,12 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"pinger/netanaly"
-	"pinger/nettool"
-	"pinger/proc"
 	"strconv"
 	"time"
 
+	"github.com/CloudDetail/node-agent/netanaly"
+	"github.com/CloudDetail/node-agent/nettool"
+	"github.com/CloudDetail/node-agent/proc"
 	"github.com/vishvananda/netns"
 	"inet.af/netaddr"
 )

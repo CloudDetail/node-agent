@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"pinger/netanaly"
 	"strconv"
 
+	"github.com/CloudDetail/node-agent/netanaly"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

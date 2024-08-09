@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"pinger/nettool"
-	"pinger/proc"
 	"sync"
 
-	"github.com/CloudDetail/originx-module/meta/configs"
-	"github.com/CloudDetail/originx-module/meta/model/cache"
-	"github.com/CloudDetail/originx-module/meta/source"
+	"github.com/CloudDetail/metadata/configs"
+	"github.com/CloudDetail/metadata/model/cache"
+	"github.com/CloudDetail/metadata/source"
+	"github.com/CloudDetail/node-agent/nettool"
+	"github.com/CloudDetail/node-agent/proc"
 	"github.com/vishvananda/netns"
 )
 

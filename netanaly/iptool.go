@@ -6,10 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"pinger/nettool"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/CloudDetail/node-agent/nettool"
 )
 
 func IPv4MappedToIPv6(ipv6Address string) (bool, string) {

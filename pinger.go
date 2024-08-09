@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"pinger/proc"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/CloudDetail/node-agent/proc"
 	"github.com/vishvananda/netns"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
