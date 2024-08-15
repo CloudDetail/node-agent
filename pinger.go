@@ -23,6 +23,7 @@ import (
 const (
 	pingReplyPollTimeout = 10 * time.Millisecond
 	protocolICMP         = 1 // Internet Control Message
+	maxRTT               = 1.0
 )
 
 var (
@@ -88,6 +89,11 @@ func Ping(ns netns.NsHandle, originNs netns.NsHandle, targets []netaddr.IP, time
 	for {
 		select {
 		case <-timeoutTicker.C:
+			for _, ip := range targets {
+				if _, ok := rttByIp[ip]; !ok {
+					rttByIp[ip] = maxRTT
+				}
+			}
 			return rttByIp, nil
 		default:
 			if len(rttByIp) == len(targets) {
