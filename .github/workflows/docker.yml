@@ -4,10 +4,11 @@ on:
   push:
     tags:
       - v*
+  workflow_dispatch:
 
 env:
   APP_NAME: node-agent
-  DOCKERHUB_REPO: docker.io/originxhub/node-agent
+  DOCKERHUB_REPO: docker.io/fuwx/node-agent
 
 jobs:
   main:
