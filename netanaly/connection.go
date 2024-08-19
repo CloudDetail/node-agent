@@ -1,7 +1,6 @@
 package netanaly
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -70,10 +69,10 @@ var GlobalRttMap = make(map[string]map[string]Result)
 
 var GlobalRttMutex = &sync.RWMutex{}
 
-func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle) {
+func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[string]Result) {
 	ns, err := proc.GetNetNs(pid)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 	defer ns.Close()
@@ -83,17 +82,17 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle) {
 		tuples6, _ := c.ListTcp6Conns()
 		c.CloseConnection()
 		for _, tuple := range tuples4 {
-			AddPing(tuple.SrcIp, tuple.DstIp, pid)
+			AddPing(tuple.SrcIp, tuple.DstIp, pid, rttMap)
 		}
 		for _, tuple := range tuples6 {
-			AddPing(tuple.SrcIp, tuple.DstIp, pid)
+			AddPing(tuple.SrcIp, tuple.DstIp, pid, rttMap)
 		}
 		return nil
 	})
 }
 
-func addResult(ip4LaString string, ip4ReString string, pid uint32, serviceIp string) {
-	reMap, isFound := GlobalRttMap[ip4LaString]
+func addResult(ip4LaString string, ip4ReString string, pid uint32, serviceIp string, rttMap map[string]map[string]Result) {
+	reMap, isFound := rttMap[ip4LaString]
 	if isFound {
 		re, isFoundRe := reMap[ip4ReString]
 		if !isFoundRe {
@@ -113,23 +112,21 @@ func addResult(ip4LaString string, ip4ReString string, pid uint32, serviceIp str
 		result.Pid[pid] = struct{}{}
 		result.ServiceIp = serviceIp
 		reMap[ip4ReString] = *result
-		GlobalRttMap[ip4LaString] = reMap
+		rttMap[ip4LaString] = reMap
 	}
 }
 
-func AddPing(ip4LaString string, ip4ReString string, pid uint32) {
+func AddPing(ip4LaString string, ip4ReString string, pid uint32, rttMap map[string]map[string]Result) {
 	if ip4LaString == ip4ReString {
 		return
 	}
 	service, ok := cache.Querier.GetServiceByIP("", ip4ReString)
-	GlobalRttMutex.Lock()
 	if ok {
 		podsIp := service.EndPoints()
 		for _, podIp := range podsIp {
-			addResult(ip4LaString, podIp, pid, ip4ReString)
+			addResult(ip4LaString, podIp, pid, ip4ReString, rttMap)
 		}
 	} else {
-		addResult(ip4LaString, ip4ReString, pid, "")
+		addResult(ip4LaString, ip4ReString, pid, "", rttMap)
 	}
-	GlobalRttMutex.Unlock()
 }

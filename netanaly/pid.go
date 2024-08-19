@@ -25,7 +25,7 @@ var processType = []string{}
 var pidSpan = 1
 var UserHZ = 100
 
-var GloablPidMutex = &sync.RWMutex{}
+var GlobalPidMutex = &sync.RWMutex{}
 var GlobalNeedMonitorPid = make(map[int]*ProcessInfo)
 
 type ProcessInfo struct {
@@ -61,7 +61,7 @@ func UpdatePid() {
 				newSet[pid] = struct{}{}
 			}
 
-			GloablPidMutex.Lock()
+			GlobalPidMutex.Lock()
 			for pid := range GlobalNeedMonitorPid {
 				if _, ok := newSet[pid]; !ok {
 					delete(GlobalNeedMonitorPid, pid)
@@ -73,7 +73,7 @@ func UpdatePid() {
 					GlobalNeedMonitorPid[pid] = pids[pid]
 				}
 			}
-			GloablPidMutex.Unlock()
+			GlobalPidMutex.Unlock()
 		}
 	}
 
