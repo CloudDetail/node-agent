@@ -22,10 +22,9 @@ var invalidProcess = []string{
 }
 
 var processType = []string{}
-var pidSpan = 1
 var UserHZ = 100
 
-var GloablPidMutex = &sync.RWMutex{}
+var GlobalPidMutex = &sync.RWMutex{}
 var GlobalNeedMonitorPid = make(map[int]*ProcessInfo)
 
 type ProcessInfo struct {
@@ -37,10 +36,6 @@ func init() {
 	if types != "" {
 		processType = strings.Split(types, ",")
 	}
-
-	if value, err := strconv.Atoi(os.Getenv("PID_SPAN")); err == nil {
-		pidSpan = value
-	}
 }
 
 func GetPid() {
@@ -51,32 +46,25 @@ func GetPid() {
 }
 
 func UpdatePid() {
-	ticker := time.NewTicker(time.Duration(pidSpan) * time.Minute)
-	for {
-		select {
-		case <-ticker.C:
-			pids := listPids()
-			newSet := make(map[int]struct{})
-			for pid, _ := range pids {
-				newSet[pid] = struct{}{}
-			}
+	pids := listPids()
+	newSet := make(map[int]struct{})
+	for pid, _ := range pids {
+		newSet[pid] = struct{}{}
+	}
 
-			GloablPidMutex.Lock()
-			for pid := range GlobalNeedMonitorPid {
-				if _, ok := newSet[pid]; !ok {
-					delete(GlobalNeedMonitorPid, pid)
-				}
-			}
-
-			for pid := range newSet {
-				if _, ok := GlobalNeedMonitorPid[pid]; !ok {
-					GlobalNeedMonitorPid[pid] = pids[pid]
-				}
-			}
-			GloablPidMutex.Unlock()
+	GlobalPidMutex.Lock()
+	for pid := range GlobalNeedMonitorPid {
+		if _, ok := newSet[pid]; !ok {
+			delete(GlobalNeedMonitorPid, pid)
 		}
 	}
 
+	for pid := range newSet {
+		if _, ok := GlobalNeedMonitorPid[pid]; !ok {
+			GlobalNeedMonitorPid[pid] = pids[pid]
+		}
+	}
+	GlobalPidMutex.Unlock()
 }
 
 func listPids() map[int]*ProcessInfo {

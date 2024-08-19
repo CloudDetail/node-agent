@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -53,10 +53,8 @@ func (rc *RttCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 
-	var livepid []uint32
-
 	if processTime {
-		netanaly.GloablPidMutex.RLock()
+		netanaly.GlobalPidMutex.RLock()
 		for pid, processInfo := range netanaly.GlobalNeedMonitorPid {
 			ch <- prometheus.MustNewConstMetric(
 				processStartTime, prometheus.GaugeValue,
@@ -65,19 +63,14 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 				nodeName,
 				nodeIp,
 			)
-			livepid = append(livepid, uint32(pid))
 		}
-		netanaly.GloablPidMutex.RUnlock()
+		netanaly.GlobalPidMutex.RUnlock()
 	}
 
 	netanaly.RttResultMapMutex.Lock()
 	for tuple, statistic := range netanaly.GlobalRttResultMap {
 		for _, n := range statistic.Pids {
-			if livePid(livepid, n) == false {
-				continue
-			}
 			pid := strconv.Itoa(int(n))
-			//pid := strconv.FormatUint(uint64(statistic.Pids[0]), 10)
 			rtt := statistic.SumLatency / float64(statistic.Count)
 			srcPod := ""
 			srcNamespace := ""
@@ -137,7 +130,7 @@ func init() {
 	prometheus.MustRegister(rc)
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
-		fmt.Println("Prometheus metrics server started on :9408")
+		log.Println("Prometheus metrics server started on :9408")
 		http.ListenAndServe(":9408", nil)
 	}()
 }
@@ -156,13 +149,4 @@ func createRttMetric(
 		dst_pod, dst_namespace, dst_node,
 		node_name, node_ip,
 	)
-}
-
-func livePid(pids []uint32, pid uint32) bool {
-	for _, p := range pids {
-		if p == pid {
-			return true
-		}
-	}
-	return false
 }

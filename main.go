@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -17,14 +16,16 @@ import (
 )
 
 var pingSpan = 5
+var pidSpan = 1
 
 func init() {
 	go netanaly.InitMetaData()
 	envVar := os.Getenv("PING_SPAN")
 	if value, err := strconv.Atoi(envVar); err == nil {
 		pingSpan = value
-	} else {
-		log.Println("Error converting PING_SPAN variable to integer:", err)
+	}
+	if value, err := strconv.Atoi(os.Getenv("PID_SPAN")); err == nil {
+		pidSpan = value
 	}
 }
 
@@ -39,34 +40,45 @@ func main() {
 	go func() {
 		selfNs, err := proc.GetSelfNetNs()
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 		netanaly.GetPid()
+		rttMap := make(map[string]map[string]netanaly.Result)
 		for mPid := range netanaly.GlobalNeedMonitorPid {
-			netanaly.GetNeedPingsIp(uint32(mPid), selfNs)
+			netanaly.GetNeedPingsIp(uint32(mPid), selfNs, rttMap)
 		}
+		log.Println(rttMap)
+		netanaly.GlobalRttMap = rttMap
 		selfNs.Close()
-		go netanaly.UpdatePid()
 
-		ticker := time.NewTicker(10 * time.Minute)
+		ticker := time.NewTicker(time.Duration(pidSpan) * time.Minute)
 		for {
 			select {
 			case <-ticker.C:
-				// netanaly.UpdatePid()
+				netanaly.UpdatePid()
 				selfNs, err := proc.GetSelfNetNs()
 				if err != nil {
-					fmt.Println(err)
+					log.Fatalln(err)
 				}
+
 				var needPid []uint32
-				netanaly.GloablPidMutex.RLock()
+				netanaly.GlobalPidMutex.RLock()
 				for pid := range netanaly.GlobalNeedMonitorPid {
 					needPid = append(needPid, uint32(pid))
 				}
-				netanaly.GloablPidMutex.RUnlock()
-				fmt.Println("needPid:", needPid)
+				netanaly.GlobalPidMutex.RUnlock()
+
+				rttMap := make(map[string]map[string]netanaly.Result)
+				log.Printf("needPid: %v", needPid)
 				for _, mPid := range needPid {
-					netanaly.GetNeedPingsIp(mPid, selfNs)
+					netanaly.GetNeedPingsIp(mPid, selfNs, rttMap)
 				}
+				log.Println(rttMap)
+
+				netanaly.GlobalRttMutex.Lock()
+				netanaly.GlobalRttMap = rttMap
+				netanaly.GlobalRttMutex.Unlock()
+
 				selfNs.Close()
 			}
 		}
@@ -110,8 +122,8 @@ func updateRttResultMap(tuple nettool.Tuple, f float64, pid map[uint32]struct{})
 func PingIp() {
 	selfNs, _ := proc.GetSelfNetNs()
 	defer selfNs.Close()
-	netanaly.GlobalRttMutex.Lock()
-	defer netanaly.GlobalRttMutex.Unlock()
+	netanaly.GlobalRttMutex.RLock()
+	defer netanaly.GlobalRttMutex.RUnlock()
 	for srcIp, reMap := range netanaly.GlobalRttMap {
 		i := 0
 		var tmpNs netns.NsHandle

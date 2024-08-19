@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -261,7 +262,7 @@ func openConn() (*net.IPConn, error) {
 		flags := unix.SOF_TIMESTAMPING_SOFTWARE | unix.SOF_TIMESTAMPING_RX_SOFTWARE | unix.SOF_TIMESTAMPING_TX_SCHED |
 			unix.SOF_TIMESTAMPING_OPT_CMSG | unix.SOF_TIMESTAMPING_OPT_TSONLY
 		if err := syscall.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_TIMESTAMPING, flags); err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return nil, err
 		}
 	} else {
