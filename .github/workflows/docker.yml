@@ -8,7 +8,7 @@ on:
 
 env:
   APP_NAME: node-agent
-  DOCKERHUB_REPO: docker.io/apo/node-agent
+  DOCKERHUB_REPO: registry.cn-hangzhou.aliyuncs.com/kindlingx/node-agent
 
 jobs:
   main:

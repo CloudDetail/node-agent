@@ -1,0 +1,42 @@
+name: Build Binary
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+    
+    - name: Generate App Version
+      run: echo APP_VERSION=$(git describe --tags --always) >> $GITHUB_ENV
+
+    - name: Build
+      run: |
+        go build -o node-agent
+
+    - name: Archive binary
+      run: |
+        tar -czvf node-agent.tar.gz node-agent
+
+    - name: Upload to OSS
+      env:
+        OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+        OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+        OSS_BUCKET: apo-oss
+        OSS_ENDPOINT: https://oss-cn-hangzhou.aliyuncs.com/
+      run: |
+        curl https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
+        sudo ossutil config -e $OSS_ENDPOINT -i $OSS_ACCESS_KEY_ID -k $OSS_ACCESS_KEY_SECRET -L CH -c /root/.ossutilconfig
+        sudo ossutil cp node-agent.tar.gz oss://$OSS_BUCKET/node-agent-linux-amd64-${{ env.APP_VERSION }}.tar.gz
