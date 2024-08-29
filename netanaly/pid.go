@@ -1,8 +1,10 @@
 package netanaly
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +31,7 @@ var GlobalNeedMonitorPid = make(map[int]*ProcessInfo)
 
 type ProcessInfo struct {
 	StartTime time.Time
+	ContainId string
 }
 
 func init() {
@@ -104,6 +107,7 @@ func listPids() map[int]*ProcessInfo {
 		}
 		pids[intpid] = &ProcessInfo{
 			StartTime: *startTime,
+			ContainId: GetContainerId(intpid),
 		}
 	}
 	return pids
@@ -125,6 +129,46 @@ func filterProcess(command string) bool {
 		}
 	}
 	return true
+}
+
+func GetContainerId(pid int) string {
+	cgroupPath := filepath.Join("/proc", fmt.Sprint(pid), "cgroup")
+
+	file, err := os.Open(cgroupPath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, ":")
+		if len(parts) == 3 {
+			Field := parts[2]
+			containerID := filepath.Base(Field)
+			if strings.Contains(Field, "docker") {
+				if len(containerID) >= 12 {
+					return containerID[:12]
+				}
+			} else if strings.Contains(Field, "kubepods") {
+				prefix := "cri-containerd-"
+				startIndex := strings.Index(containerID, prefix)
+				if startIndex == -1 {
+					return ""
+				}
+				startIndex += len(prefix)
+				if startIndex+12 > len(containerID) {
+					return ""
+				}
+				return containerID[startIndex : startIndex+12]
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return ""
+	}
+	return ""
 }
 
 func getProcessStartTime(pid int) (*time.Time, error) {
