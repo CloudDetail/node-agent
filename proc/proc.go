@@ -1,13 +1,11 @@
 package proc
 
 import (
-	"bytes"
 	"os"
 	"path"
 	"strconv"
 	"strings"
-
-	"github.com/coroot/coroot-node-agent/cgroup"
+	"time"
 )
 
 var root = "/proc"
@@ -20,57 +18,69 @@ func HostPath(p string) string {
 	return Path(1, "root", p)
 }
 
-func GetCmdline(pid uint32) []byte {
+func getCommand(pid uint32) string {
 	cmdline, err := os.ReadFile(Path(pid, "cmdline"))
 	if err != nil {
-		return nil
+		return ""
 	}
-	return bytes.TrimSuffix(cmdline, []byte{0})
+	return strings.Replace(string(cmdline), "\x00", " ", -1)
 }
-
-func GetNsPid(pid uint32) uint32 {
-	data, err := os.ReadFile(Path(pid, "status"))
+func getContainerId(pid uint32) string {
+	data, err := os.ReadFile(Path(pid, "cgroup"))
 	if err != nil {
-		return pid
+		return ""
 	}
+	subsystems := make(map[string]string)
+	var cgroupContent string
+
 	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) < 3 {
 			continue
 		}
-		if fields[0] == "NSpid:" {
-			if len(fields) == 3 {
-				if nsPid, err := strconv.ParseUint(fields[2], 10, 32); err == nil {
-					return uint32(nsPid)
-				}
-			}
-			return pid
+		for _, cgType := range strings.Split(parts[1], ",") {
+			subsystems[cgType] = path.Join("", parts[2])
 		}
 	}
-	return pid
+	if p := subsystems["name=systemd"]; p != "" {
+		cgroupContent = p
+	} else if p = subsystems["cpu"]; p != "" {
+		cgroupContent = p
+	} else {
+		cgroupContent = subsystems[""]
+	}
+	if ContainerId, err := containerByCgroup(cgroupContent); err != nil && len(ContainerId) >= 12 {
+		return ContainerId[:12]
+	}
+	return ""
 }
-
-func ReadCgroup(pid uint32) (*cgroup.Cgroup, error) {
-	return cgroup.NewFromProcessCgroupFile(Path(pid, "cgroup"))
-}
-
-func ListPids() ([]uint32, error) {
-	root, err := os.Open(root)
+func getProcessStartTime(pid uint32) (*time.Time, error) {
+	data, err := os.ReadFile(Path(pid, "stat"))
 	if err != nil {
 		return nil, err
 	}
-	defer root.Close()
-	dirs, err := root.Readdirnames(0)
+
+	stats := strings.Fields(string(data))
+
+	startTimeJiffies, err := strconv.ParseUint(stats[21], 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	res := make([]uint32, 0, len(dirs))
-	for _, dir := range dirs {
-		pid64, err := strconv.ParseUint(dir, 10, 32)
-		if err != nil {
-			continue
-		}
-		res = append(res, uint32(pid64))
+
+	uptimeData, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return nil, err
 	}
-	return res, nil
+
+	uptimeFields := strings.Fields(string(uptimeData))
+	uptimeSeconds, err := strconv.ParseFloat(uptimeFields[0], 64)
+	if err != nil {
+		return nil, err
+	}
+
+	startTimeSeconds := float64(startTimeJiffies) / float64(UserHZ)
+	bootTime := time.Now().Add(-time.Duration(uptimeSeconds) * time.Second)
+	processStartTime := bootTime.Add(time.Duration(startTimeSeconds) * time.Second)
+
+	return &processStartTime, nil
 }

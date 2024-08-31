@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/CloudDetail/node-agent/netanaly"
+	"github.com/CloudDetail/node-agent/proc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -54,10 +55,10 @@ func (rc *RttCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
-
+	pid2cid := make(map[uint32]string)
 	if processTime {
-		netanaly.GlobalPidMutex.RLock()
-		for pid, processInfo := range netanaly.GlobalNeedMonitorPid {
+		proc.GlobalPidMutex.RLock()
+		for pid, processInfo := range proc.GlobalNeedMonitorPid {
 			ch <- prometheus.MustNewConstMetric(
 				processStartTime, prometheus.GaugeValue,
 				float64(processInfo.StartTime.Unix()),
@@ -66,14 +67,16 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 				nodeIp,
 				processInfo.ContainId,
 			)
+			pid2cid[pid] = processInfo.ContainId
 		}
-		netanaly.GlobalPidMutex.RUnlock()
+		proc.GlobalPidMutex.RUnlock()
 	}
 
 	netanaly.RttResultMapMutex.Lock()
 	for tuple, statistic := range netanaly.GlobalRttResultMap {
 		for _, n := range statistic.Pids {
 			pid := strconv.Itoa(int(n))
+			containerId := pid2cid[n]
 			rtt := statistic.SumLatency / float64(statistic.Count)
 			srcPod := ""
 			srcNamespace := ""
@@ -90,7 +93,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 					tuple.SrcIp, tuple.ServiceIp, pid, "service",
 					srcPod, srcNamespace, srcNode,
 					"", "", "",
-					nodeName, nodeIp, netanaly.GetContainerId(int(n)),
+					nodeName, nodeIp, containerId,
 				)
 			} else {
 				dstPod := ""
@@ -107,7 +110,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 					tuple.SrcIp, tuple.DstIp, pid, "instance",
 					srcPod, srcNamespace, srcNode,
 					dstPod, dstNamespace, dstNode,
-					nodeName, nodeIp, netanaly.GetContainerId(int(n)),
+					nodeName, nodeIp, containerId,
 				)
 			}
 		}

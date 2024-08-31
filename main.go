@@ -42,10 +42,10 @@ func main() {
 		if err != nil {
 			log.Println(err)
 		}
-		netanaly.GetPid()
+		proc.GetPid()
 		rttMap := make(map[string]map[string]netanaly.Result)
-		for mPid := range netanaly.GlobalNeedMonitorPid {
-			netanaly.GetNeedPingsIp(uint32(mPid), selfNs, rttMap)
+		for mPid := range proc.GlobalNeedMonitorPid {
+			netanaly.GetNeedPingsIp(mPid, selfNs, rttMap)
 		}
 		log.Println(rttMap)
 		netanaly.GlobalRttMap = rttMap
@@ -55,21 +55,21 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				netanaly.UpdatePid()
+				proc.UpdatePid()
 				selfNs, err := proc.GetSelfNetNs()
 				if err != nil {
 					log.Fatalln(err)
 				}
 
 				var needPid []uint32
-				netanaly.GlobalPidMutex.RLock()
-				for pid := range netanaly.GlobalNeedMonitorPid {
-					needPid = append(needPid, uint32(pid))
+				proc.GlobalPidMutex.RLock()
+				for pid := range proc.GlobalNeedMonitorPid {
+					needPid = append(needPid, pid)
 				}
-				netanaly.GlobalPidMutex.RUnlock()
+				proc.GlobalPidMutex.RUnlock()
 
 				rttMap := make(map[string]map[string]netanaly.Result)
-				log.Printf("needPid: %v", needPid)
+				log.Printf("Moniter Pid: %v", needPid)
 				for _, mPid := range needPid {
 					netanaly.GetNeedPingsIp(mPid, selfNs, rttMap)
 				}
