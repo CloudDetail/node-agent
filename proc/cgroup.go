@@ -7,11 +7,12 @@ import (
 )
 
 var (
-	dockerIdRegexp      = regexp.MustCompile(`([a-z0-9]{64})`)
-	crioIdRegexp        = regexp.MustCompile(`crio-([a-z0-9]{64})`)
-	containerdIdRegexp  = regexp.MustCompile(`cri-containerd[-:]([a-z0-9]{64})`)
-	lxcIdRegexp         = regexp.MustCompile(`/lxc/([^/]+)`)
-	systemSliceIdRegexp = regexp.MustCompile(`(/(system|runtime)\.slice/([^/]+))`)
+	dockerIdRegexp     = regexp.MustCompile(`([a-z0-9]{64})`)
+	crioIdRegexp       = regexp.MustCompile(`crio-([a-z0-9]{64})`)
+	containerdIdRegexp = regexp.MustCompile(`cri-containerd[-:]([a-z0-9]{64})`)
+
+// lxcIdRegexp         = regexp.MustCompile(`/lxc/([^/]+)`)
+// systemSliceIdRegexp = regexp.MustCompile(`(/(system|runtime)\.slice/([^/]+))`)
 )
 
 func containerByCgroup(path string) (string, error) {
@@ -48,19 +49,19 @@ func containerByCgroup(path string) (string, error) {
 		}
 		return matches[1], nil
 	}
-	if prefix == "lxc" {
-		matches := lxcIdRegexp.FindStringSubmatch(path)
-		if matches == nil {
-			return "", fmt.Errorf("invalid lxc cgroup %s", path)
-		}
-		return matches[1], nil
-	}
-	if prefix == "system.slice" || prefix == "runtime.slice" {
-		matches := systemSliceIdRegexp.FindStringSubmatch(path)
-		if matches == nil {
-			return "", fmt.Errorf("invalid systemd cgroup %s", path)
-		}
-		return strings.Replace(matches[1], "\\x2d", "-", -1), nil
-	}
+	// if prefix == "lxc" {
+	// 	matches := lxcIdRegexp.FindStringSubmatch(path)
+	// 	if matches == nil {
+	// 		return "", fmt.Errorf("invalid lxc cgroup %s", path)
+	// 	}
+	// 	return matches[1], nil
+	// }
+	// if prefix == "system.slice" || prefix == "runtime.slice" {
+	// 	matches := systemSliceIdRegexp.FindStringSubmatch(path)
+	// 	if matches == nil {
+	// 		return "", fmt.Errorf("invalid systemd cgroup %s", path)
+	// 	}
+	// 	return strings.Replace(matches[1], "\\x2d", "-", -1), nil
+	// }
 	return "", fmt.Errorf("unknown container: %s", path)
 }
