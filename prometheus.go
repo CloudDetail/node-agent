@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/CloudDetail/node-agent/netanaly"
+	"github.com/CloudDetail/node-agent/proc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -28,6 +29,7 @@ var (
 			"dst_node",
 			"node_name",
 			"node_ip",
+			"container_id",
 		},
 		nil,
 	)
@@ -38,6 +40,7 @@ var (
 			"pid",
 			"node_name",
 			"node_ip",
+			"container_id",
 		},
 		nil,
 	)
@@ -52,25 +55,28 @@ func (rc *RttCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
-
+	pid2cid := make(map[uint32]string)
 	if processTime {
-		netanaly.GlobalPidMutex.RLock()
-		for pid, processInfo := range netanaly.GlobalNeedMonitorPid {
+		proc.GlobalPidMutex.RLock()
+		for pid, processInfo := range proc.GlobalNeedMonitorPid {
 			ch <- prometheus.MustNewConstMetric(
 				processStartTime, prometheus.GaugeValue,
 				float64(processInfo.StartTime.Unix()),
 				strconv.FormatUint(uint64(pid), 10),
 				nodeName,
 				nodeIp,
+				processInfo.ContainId,
 			)
+			pid2cid[pid] = processInfo.ContainId
 		}
-		netanaly.GlobalPidMutex.RUnlock()
+		proc.GlobalPidMutex.RUnlock()
 	}
 
 	netanaly.RttResultMapMutex.Lock()
 	for tuple, statistic := range netanaly.GlobalRttResultMap {
 		for _, n := range statistic.Pids {
 			pid := strconv.Itoa(int(n))
+			containerId := pid2cid[n]
 			rtt := statistic.SumLatency / float64(statistic.Count)
 			srcPod := ""
 			srcNamespace := ""
@@ -87,7 +93,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 					tuple.SrcIp, tuple.ServiceIp, pid, "service",
 					srcPod, srcNamespace, srcNode,
 					"", "", "",
-					nodeName, nodeIp,
+					nodeName, nodeIp, containerId,
 				)
 			} else {
 				dstPod := ""
@@ -104,7 +110,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 					tuple.SrcIp, tuple.DstIp, pid, "instance",
 					srcPod, srcNamespace, srcNode,
 					dstPod, dstNamespace, dstNode,
-					nodeName, nodeIp,
+					nodeName, nodeIp, containerId,
 				)
 			}
 		}
@@ -140,13 +146,13 @@ func createRttMetric(
 	src_ip, dst_ip, pid, level,
 	src_pod, src_namespace, src_node,
 	dst_pod, dst_namespace, dst_node,
-	node_name, node_ip string,
+	node_name, node_ip, container_id string,
 ) prometheus.Metric {
 	return prometheus.MustNewConstMetric(
 		networkRTT, prometheus.GaugeValue, value,
 		src_ip, dst_ip, pid, level,
 		src_pod, src_namespace, src_node,
 		dst_pod, dst_namespace, dst_node,
-		node_name, node_ip,
+		node_name, node_ip, container_id,
 	)
 }

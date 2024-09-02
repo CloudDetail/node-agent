@@ -1,7 +1,6 @@
-package netanaly
+package proc
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -25,10 +24,11 @@ var processType = []string{}
 var UserHZ = 100
 
 var GlobalPidMutex = &sync.RWMutex{}
-var GlobalNeedMonitorPid = make(map[int]*ProcessInfo)
+var GlobalNeedMonitorPid = make(map[uint32]*ProcessInfo)
 
 type ProcessInfo struct {
 	StartTime time.Time
+	ContainId string
 }
 
 func init() {
@@ -47,8 +47,8 @@ func GetPid() {
 
 func UpdatePid() {
 	pids := listPids()
-	newSet := make(map[int]struct{})
-	for pid, _ := range pids {
+	newSet := make(map[uint32]struct{})
+	for pid := range pids {
 		newSet[pid] = struct{}{}
 	}
 
@@ -67,8 +67,8 @@ func UpdatePid() {
 	GlobalPidMutex.Unlock()
 }
 
-func listPids() map[int]*ProcessInfo {
-	pids := make(map[int]*ProcessInfo)
+func listPids() map[uint32]*ProcessInfo {
+	pids := make(map[uint32]*ProcessInfo)
 	d, err := os.Open(procPath)
 	if err != nil {
 		return pids
@@ -88,22 +88,18 @@ func listPids() map[int]*ProcessInfo {
 		if pid == 1 || pid == 2 {
 			continue
 		}
-		cmdlinePath := fmt.Sprintf("%s/%d/cmdline", procPath, pid)
-		cmdline, err := os.ReadFile(cmdlinePath)
-		if err != nil {
-			continue
-		}
-		command := strings.Replace(string(cmdline), "\x00", " ", -1)
+		intpid := uint32(pid)
+		command := getCommand(intpid)
 		if command == "" || filterProcess(command) {
 			continue
 		}
-		intpid := int(pid)
 		startTime, err := getProcessStartTime(intpid)
 		if err != nil {
 			continue
 		}
 		pids[intpid] = &ProcessInfo{
 			StartTime: *startTime,
+			ContainId: getContainerId(intpid),
 		}
 	}
 	return pids
@@ -125,36 +121,4 @@ func filterProcess(command string) bool {
 		}
 	}
 	return true
-}
-
-func getProcessStartTime(pid int) (*time.Time, error) {
-	statFilePath := fmt.Sprintf("%s/%d/stat", procPath, pid)
-	data, err := os.ReadFile(statFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	stats := strings.Fields(string(data))
-
-	startTimeJiffies, err := strconv.ParseUint(stats[21], 10, 64)
-	if err != nil {
-		return nil, err
-	}
-
-	uptimeData, err := os.ReadFile("/proc/uptime")
-	if err != nil {
-		return nil, err
-	}
-
-	uptimeFields := strings.Fields(string(uptimeData))
-	uptimeSeconds, err := strconv.ParseFloat(uptimeFields[0], 64)
-	if err != nil {
-		return nil, err
-	}
-
-	startTimeSeconds := float64(startTimeJiffies) / float64(UserHZ)
-	bootTime := time.Now().Add(-time.Duration(uptimeSeconds) * time.Second)
-	processStartTime := bootTime.Add(time.Duration(startTimeSeconds) * time.Second)
-
-	return &processStartTime, nil
 }
