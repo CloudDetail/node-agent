@@ -49,7 +49,7 @@ func getContainerId(pid uint32) string {
 	} else {
 		cgroupContent = subsystems[""]
 	}
-	if ContainerId, err := containerByCgroup(cgroupContent); err != nil && len(ContainerId) >= 12 {
+	if ContainerId, err := containerByCgroup(cgroupContent); err == nil && len(ContainerId) >= 12 {
 		return ContainerId[:12]
 	}
 	return ""
