@@ -17,6 +17,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/CloudDetail/metadata v0.0.0-20240809080233-394951895115 h1:6O9/rBmqa5Ig1n0xFTOqKoYT/7aGkzs2OYUmCr5PMg4=
 github.com/CloudDetail/metadata v0.0.0-20240809080233-394951895115/go.mod h1:YpCyr1yI2rybhXMo7STmU7qVvkRp6EDVaDRnU9Wf8ls=
+github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95 h1:52seV0rUftzIronLQOHOHbnlz4YHS4/dAB9rSHa+24M=
+github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95/go.mod h1:YpCyr1yI2rybhXMo7STmU7qVvkRp6EDVaDRnU9Wf8ls=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
