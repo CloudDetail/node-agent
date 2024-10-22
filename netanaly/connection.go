@@ -10,6 +10,7 @@ import (
 	"github.com/CloudDetail/metadata/source"
 	"github.com/CloudDetail/node-agent/nettool"
 	"github.com/CloudDetail/node-agent/proc"
+	"github.com/shirou/gopsutil/net"
 	"github.com/vishvananda/netns"
 )
 
@@ -75,6 +76,21 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 		log.Println(err)
 		return
 	}
+
+	if ns.Equal(proc.HOST_NET_NS) {
+		connets, err := net.ConnectionsPid("tcp", int32(pid))
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		for _, conn := range connets {
+			if conn.Status == "ESTABLISHED" {
+				AddPing(conn.Laddr.IP, conn.Raddr.IP, pid, rttMap)
+			}
+		}
+		return
+	}
+
 	defer ns.Close()
 	proc.ExecuteInNetNs(ns, selfNs, func() error {
 		c, _ := nettool.New()

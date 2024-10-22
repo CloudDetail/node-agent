@@ -1,12 +1,15 @@
 package proc
 
 import (
+	"runtime"
+
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
 	"inet.af/netaddr"
-	"runtime"
 )
+
+var HOST_NET_NS netns.NsHandle = GetHostNetNs()
 
 func GetNetNs(pid uint32) (netns.NsHandle, error) {
 	return netns.GetFromPid(int(pid))
@@ -16,8 +19,9 @@ func GetSelfNetNs() (netns.NsHandle, error) {
 	return netns.Get()
 }
 
-func GetHostNetNs() (netns.NsHandle, error) {
-	return GetNetNs(1)
+func GetHostNetNs() netns.NsHandle {
+	netns, _ := GetNetNs(1)
+	return netns
 }
 
 func ExecuteInNetNs(newNs, curNs netns.NsHandle, f func() error) error {

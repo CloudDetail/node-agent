@@ -14,21 +14,31 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: 1.22
-    
     - name: Generate App Version
-      run: echo APP_VERSION=$(git describe --tags --always) >> $GITHUB_ENV
-
-    - name: Build
       run: |
-        go build -o node-agent
+        TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+        if [ -n "$TAG" ]; then
+          echo "APP_VERSION=$TAG" >> $GITHUB_ENV
+        else
+          BRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's#[^a-zA-Z0-9._-]#-#g')
+          COMMIT=$(git rev-parse --short HEAD)
+          echo "APP_VERSION=${BRANCH}-${COMMIT}" >> $GITHUB_ENV
+        fi
 
-    - name: Archive binary
+    - name: Set up Centos 7 environment
       run: |
-        tar -czvf node-agent.tar.gz node-agent
+        sudo docker pull centos:7
+        sudo docker run -v ${{ github.workspace }}:/workspace -w /workspace centos:7 /bin/bash -c "
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* &&
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* &&
+          yum -y update &&
+          yum -y install gcc make wget &&
+          wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz && 
+          rm -rf /usr/local/go && 
+          tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz &&
+          export PATH=$PATH:/usr/local/go/bin &&
+          make package
+          "
 
     - name: Upload to OSS
       env:
@@ -39,4 +49,4 @@ jobs:
       run: |
         curl https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
         sudo ossutil config -e $OSS_ENDPOINT -i $OSS_ACCESS_KEY_ID -k $OSS_ACCESS_KEY_SECRET -L CH -c /root/.ossutilconfig
-        sudo ossutil cp node-agent.tar.gz oss://$OSS_BUCKET/node-agent-linux-amd64-${{ env.APP_VERSION }}.tar.gz
+        sudo ossutil cp dist/node-agent.tar.gz oss://$OSS_BUCKET/node-agent-linux-amd64-${{ env.APP_VERSION }}.tar.gz
