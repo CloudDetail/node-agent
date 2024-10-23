@@ -142,10 +142,12 @@ func AddPing(ip4LaString string, ip4ReString string, pid uint32, rttMap map[stri
 	service, ok := cache.Querier.GetServiceByIP("", ip4ReString)
 	if ok {
 		podsIp := service.EndPoints()
+		log.Printf("src: %s dst: %s endpoints: %v\n", ip4LaString, ip4ReString, podsIp)
 		for _, podIp := range podsIp {
 			addResult(ip4LaString, podIp, pid, ip4ReString, rttMap)
 		}
 	} else {
+		log.Printf("src: %s dst: %s\n", ip4LaString, ip4ReString)
 		addResult(ip4LaString, ip4ReString, pid, "", rttMap)
 	}
 }

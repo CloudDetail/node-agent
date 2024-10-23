@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -13,6 +14,26 @@ import (
 )
 
 var (
+	networkPacketLossRTT = prometheus.NewDesc(
+		"kindling_network_packet_loss_rtt",
+		"Network Round-Trip Time (RTT)",
+		[]string{
+			"src_ip",
+			"dst_ip",
+			"pid",
+			"level",
+			"src_pod",
+			"src_namespace",
+			"src_node",
+			"dst_pod",
+			"dst_namespace",
+			"dst_node",
+			"node_name",
+			"node_ip",
+			"container_id",
+		},
+		nil,
+	)
 	networkRTT = prometheus.NewDesc(
 		"kindling_network_rtt",
 		"Network Round-Trip Time (RTT)",
@@ -148,11 +169,21 @@ func createRttMetric(
 	dst_pod, dst_namespace, dst_node,
 	node_name, node_ip, container_id string,
 ) prometheus.Metric {
-	return prometheus.MustNewConstMetric(
-		networkRTT, prometheus.GaugeValue, value,
-		src_ip, dst_ip, pid, level,
-		src_pod, src_namespace, src_node,
-		dst_pod, dst_namespace, dst_node,
-		node_name, node_ip, container_id,
-	)
+	if math.Abs(value-1.0) < 1e-9 {
+		return prometheus.MustNewConstMetric(
+			networkPacketLossRTT, prometheus.GaugeValue, value,
+			src_ip, dst_ip, pid, level,
+			src_pod, src_namespace, src_node,
+			dst_pod, dst_namespace, dst_node,
+			node_name, node_ip, container_id,
+		)
+	} else {
+		return prometheus.MustNewConstMetric(
+			networkRTT, prometheus.GaugeValue, value,
+			src_ip, dst_ip, pid, level,
+			src_pod, src_namespace, src_node,
+			dst_pod, dst_namespace, dst_node,
+			node_name, node_ip, container_id,
+		)
+	}
 }
