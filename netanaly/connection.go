@@ -92,7 +92,7 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 	}
 
 	defer ns.Close()
-	proc.ExecuteInNetNs(ns, selfNs, func() error {
+	err = proc.ExecuteInNetNs(ns, selfNs, func() error {
 		c, _ := nettool.New()
 		tuples4, _ := c.ListTcp4Conns()
 		tuples6, _ := c.ListTcp6Conns()
@@ -105,6 +105,9 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 		}
 		return nil
 	})
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func addResult(ip4LaString string, ip4ReString string, pid uint32, serviceIp string, rttMap map[string]map[string]Result) {
