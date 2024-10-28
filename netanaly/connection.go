@@ -76,6 +76,7 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 		log.Println(err)
 		return
 	}
+	defer ns.Close()
 
 	if ns.Equal(proc.HOST_NET_NS) {
 		connets, err := net.ConnectionsPid("tcp", int32(pid))
@@ -91,7 +92,6 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 		return
 	}
 
-	defer ns.Close()
 	err = proc.ExecuteInNetNs(ns, selfNs, func() error {
 		c, _ := nettool.New()
 		tuples4, _ := c.ListTcp4Conns()
@@ -147,7 +147,6 @@ func AddPing(ip4LaString string, ip4ReString string, pid uint32, rttMap map[stri
 			addResult(ip4LaString, podIp, pid, ip4ReString, rttMap)
 		}
 	} else {
-		log.Printf("src: %s dst: %s\n", ip4LaString, ip4ReString)
 		addResult(ip4LaString, ip4ReString, pid, "", rttMap)
 	}
 }
