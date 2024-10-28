@@ -6,6 +6,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/CloudDetail/metadata/model/cache"
+	"github.com/CloudDetail/node-agent/util"
 )
 
 const procPath = "/proc"
@@ -21,6 +24,7 @@ var invalidProcess = []string{
 }
 
 var processType = []string{}
+var k8sNameSpace = []string{}
 var UserHZ = 100
 
 var GlobalPidMutex = &sync.RWMutex{}
@@ -35,6 +39,10 @@ func init() {
 	types := os.Getenv("PROCESS_TYPE")
 	if types != "" {
 		processType = strings.Split(types, ",")
+	}
+	namespaces := os.Getenv("GO_K8S_NAMESPACE")
+	if namespaces != "" {
+		k8sNameSpace = strings.Split(namespaces, ",")
 	}
 }
 
@@ -89,8 +97,9 @@ func listPids() map[uint32]*ProcessInfo {
 			continue
 		}
 		intpid := uint32(pid)
+		cid := getContainerId(intpid)
 		command := getCommand(intpid)
-		if command == "" || filterProcess(command) {
+		if command == "" || filterProcess(command, cid) {
 			continue
 		}
 		startTime, err := getProcessStartTime(intpid)
@@ -99,14 +108,14 @@ func listPids() map[uint32]*ProcessInfo {
 		}
 		pids[intpid] = &ProcessInfo{
 			StartTime: *startTime,
-			ContainId: getContainerId(intpid),
+			ContainId: cid,
 		}
 	}
 	return pids
 }
 
 // 过滤进程，先黑名单，后白名单
-func filterProcess(command string) bool {
+func filterProcess(command string, cid string) bool {
 	for _, invalid := range invalidProcess {
 		if strings.HasPrefix(command, invalid) {
 			return true
@@ -117,6 +126,13 @@ func filterProcess(command string) bool {
 	}
 	for _, t := range processType {
 		if strings.Contains(command, t) {
+			return false
+		}
+	}
+	// 针对 go应用程序 按照namespace过滤, 在监控的namespace下就不过滤
+	pods := cache.Querier.ListPod("")
+	for _, pod := range pods {
+		if util.Contains(k8sNameSpace, pod.NS()) && util.Contains(pod.ContainerIDs(), cid) {
 			return false
 		}
 	}
