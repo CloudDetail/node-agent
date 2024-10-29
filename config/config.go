@@ -20,6 +20,8 @@ type Config struct {
 	FetchSourceAddr string
 	AuthType        string
 	KubeConfig      string
+
+	Kernel317 bool
 }
 
 func (c *Config) SetDefault() {
@@ -57,7 +59,7 @@ func newConfig() *Config {
 
 	cfg.NodeName = os.Getenv("MY_NODE_NAME")
 	cfg.NodeIP = os.Getenv("MY_NODE_IP")
-
+	cfg.Kernel317 = KernelBlow317()
 	cfg.SetDefault()
 	return cfg
 }

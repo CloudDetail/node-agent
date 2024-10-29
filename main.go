@@ -19,8 +19,6 @@ func main() {
 	go func() {
 		log.Println(http.ListenAndServe(":6061", nil))
 	}()
-	KernelBlow317()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	go netanaly.UpdateNetConnectInfo(ctx)
 	go pinger.Ping(ctx)

@@ -153,7 +153,7 @@ func ping(ns netns.NsHandle, originNs netns.NsHandle, targets []netaddr.IP, time
 			}
 			return nil, fmt.Errorf("failed to send packet to %s: %s", ip, err)
 		}
-		if !Kernel317 {
+		if !config.GlobalCfg.Kernel317 {
 			if pkt.txTimestamp, err = getTxTimestamp(fd); err != nil {
 				if strings.HasPrefix(err.Error(), "resource temporarily unavailable") {
 					continue
@@ -268,7 +268,7 @@ func getTxTimestamp(socketFd int) (time.Time, error) {
 	if err != nil {
 		return t, err
 	}
-	if !Kernel317 {
+	if !config.GlobalCfg.Kernel317 {
 		return getTimestampFromOutOfBandData(oob, oobn)
 	} else {
 		return getTimestampFromOutOfBandDataKernel317(oob, oobn)
@@ -292,7 +292,7 @@ func receive(conn *net.IPConn) (*net.IPAddr, *icmp.Echo, time.Time, error) {
 		return nil, nil, ts, err
 	}
 
-	if !Kernel317 {
+	if !config.GlobalCfg.Kernel317 {
 		if ts, err = getTimestampFromOutOfBandData(oob, oobn); err != nil {
 			return nil, nil, ts, fmt.Errorf("failed to get RX timestamp: %s", err)
 		}
@@ -341,7 +341,7 @@ func openConn() (*net.IPConn, error) {
 	}
 	defer f.Close()
 	fd := int(f.Fd())
-	if !Kernel317 {
+	if !config.GlobalCfg.Kernel317 {
 		flags := unix.SOF_TIMESTAMPING_SOFTWARE | unix.SOF_TIMESTAMPING_RX_SOFTWARE | unix.SOF_TIMESTAMPING_TX_SCHED |
 			unix.SOF_TIMESTAMPING_OPT_CMSG | unix.SOF_TIMESTAMPING_OPT_TSONLY
 		if err := syscall.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_TIMESTAMPING, flags); err != nil {
