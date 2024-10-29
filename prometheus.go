@@ -1,22 +1,28 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/CloudDetail/node-agent/netanaly"
 	"github.com/CloudDetail/node-agent/proc"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/utils/lru"
 )
 
 var (
-	networkPacketLossRTT = prometheus.NewDesc(
-		"kindling_network_packet_loss_rtt",
-		"Network Round-Trip Time (RTT)",
+	counterLabel    *lru.Cache
+	packetLossCount = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "originx_packet_loss_count",
+			Help: "Network packet loss count",
+		},
 		[]string{
 			"src_ip",
 			"dst_ip",
@@ -32,7 +38,6 @@ var (
 			"node_ip",
 			"container_id",
 		},
-		nil,
 	)
 	networkRTT = prometheus.NewDesc(
 		"kindling_network_rtt",
@@ -56,7 +61,7 @@ var (
 	)
 	processStartTime = prometheus.NewDesc(
 		"originx_process_start_time",
-		"Process Start Time (NS)",
+		"Process Start Time (Unix Timestamp)",
 		[]string{
 			"pid",
 			"node_name",
@@ -66,6 +71,38 @@ var (
 		nil,
 	)
 )
+
+var processTime = false
+var nodeName = ""
+var nodeIp = ""
+var cacheSize = 50000
+
+func init() {
+	if os.Getenv("PROCESS_TIME") == "true" {
+		processTime = true
+	}
+	nodeName = os.Getenv("MY_NODE_NAME")
+	nodeIp = os.Getenv("MY_NODE_IP")
+	envVar := os.Getenv("LRU_CACHE_SIZE")
+	if value, err := strconv.Atoi(envVar); err == nil {
+		cacheSize = value
+	}
+
+	counterLabel = lru.NewWithEvictionFunc(cacheSize, func(key lru.Key, value interface{}) {
+		labelstr := key.(string)
+		labels := strings.Split(labelstr, ":")
+		packetLossCount.DeleteLabelValues(labels...)
+	})
+
+	rc := &RttCollector{}
+	prometheus.MustRegister(rc)
+	prometheus.MustRegister(packetLossCount)
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		log.Println("Prometheus metrics server started on :9408")
+		http.ListenAndServe(":9408", nil)
+	}()
+}
 
 type RttCollector struct {
 }
@@ -110,6 +147,15 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 				srcNode = node.Name
 			}
 			if tuple.ServiceIp != "" {
+				if math.Abs(rtt-1.0) < 1e-9 {
+					getOrCreateCounter(
+						tuple.SrcIp, tuple.ServiceIp, pid, "service",
+						srcPod, srcNamespace, srcNode,
+						"", "", "",
+						nodeName, nodeIp, containerId,
+					).Inc()
+					continue
+				}
 				ch <- createRttMetric(rtt,
 					tuple.SrcIp, tuple.ServiceIp, pid, "service",
 					srcPod, srcNamespace, srcNode,
@@ -127,6 +173,15 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 				} else if node, ok := netanaly.GetNodeByIP(tuple.DstIp); ok {
 					dstNode = node.Name
 				}
+				if math.Abs(rtt-1.0) < 1e-9 {
+					getOrCreateCounter(
+						tuple.SrcIp, tuple.DstIp, pid, "instance",
+						srcPod, srcNamespace, srcNode,
+						dstPod, dstNamespace, dstNode,
+						nodeName, nodeIp, containerId,
+					).Inc()
+					continue
+				}
 				ch <- createRttMetric(rtt,
 					tuple.SrcIp, tuple.DstIp, pid, "instance",
 					srcPod, srcNamespace, srcNode,
@@ -142,24 +197,27 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 	netanaly.RttResultMapMutex.Unlock()
 }
 
-var processTime = false
-var nodeName = ""
-var nodeIp = ""
+func getOrCreateCounter(src_ip, dst_ip, pid, level,
+	src_pod, src_namespace, src_node,
+	dst_pod, dst_namespace, dst_node,
+	node_name, node_ip, container_id string,
+) prometheus.Counter {
+	key := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s",
+		src_ip, dst_ip, pid, level,
+		src_pod, src_namespace, src_node,
+		dst_pod, dst_namespace, dst_node,
+		node_name, node_ip, container_id)
 
-func init() {
-	if os.Getenv("PROCESS_TIME") == "true" {
-		processTime = true
+	if _, found := counterLabel.Get(key); !found {
+		counterLabel.Add(key, struct{}{})
 	}
-	nodeName = os.Getenv("MY_NODE_NAME")
-	nodeIp = os.Getenv("MY_NODE_IP")
 
-	rc := &RttCollector{}
-	prometheus.MustRegister(rc)
-	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		log.Println("Prometheus metrics server started on :9408")
-		http.ListenAndServe(":9408", nil)
-	}()
+	return packetLossCount.WithLabelValues(
+		src_ip, dst_ip, pid, level,
+		src_pod, src_namespace, src_node,
+		dst_pod, dst_namespace, dst_node,
+		node_name, node_ip, container_id,
+	)
 }
 
 func createRttMetric(
@@ -169,21 +227,11 @@ func createRttMetric(
 	dst_pod, dst_namespace, dst_node,
 	node_name, node_ip, container_id string,
 ) prometheus.Metric {
-	if math.Abs(value-1.0) < 1e-9 {
-		return prometheus.MustNewConstMetric(
-			networkPacketLossRTT, prometheus.GaugeValue, value,
-			src_ip, dst_ip, pid, level,
-			src_pod, src_namespace, src_node,
-			dst_pod, dst_namespace, dst_node,
-			node_name, node_ip, container_id,
-		)
-	} else {
-		return prometheus.MustNewConstMetric(
-			networkRTT, prometheus.GaugeValue, value,
-			src_ip, dst_ip, pid, level,
-			src_pod, src_namespace, src_node,
-			dst_pod, dst_namespace, dst_node,
-			node_name, node_ip, container_id,
-		)
-	}
+	return prometheus.MustNewConstMetric(
+		networkRTT, prometheus.GaugeValue, value,
+		src_ip, dst_ip, pid, level,
+		src_pod, src_namespace, src_node,
+		dst_pod, dst_namespace, dst_node,
+		node_name, node_ip, container_id,
+	)
 }

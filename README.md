@@ -21,7 +21,9 @@ docker run -d --rm \
 
 ## 配置环境变量
 
-- PROCESS_TYPE: 监控的应用类型，支持java,python,node
+- PROCESS_TYPE: 监控的应用启动名称白名单，如java,python,node
+- K8S_NAMESPACE_WHITELIST: k8s命名空间白名单, 如default,go-auto
+- LRU_CACHE_SIZE 指标缓存大小，默认为50000
 - PROCESS_TIME: 是否监控应用启动时间
 - PID_SCAN: 更新进程pid信息的间隔时间，默认为1分钟
 - PING_SCAN: 更新进程ping信息的间隔时间，默认为5s

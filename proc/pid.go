@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/CloudDetail/metadata/model/cache"
-	"github.com/CloudDetail/node-agent/util"
+	"github.com/CloudDetail/node-agent/utils"
 )
 
 const procPath = "/proc"
@@ -40,7 +40,7 @@ func init() {
 	if types != "" {
 		processType = strings.Split(types, ",")
 	}
-	namespaces := os.Getenv("GO_K8S_NAMESPACE")
+	namespaces := os.Getenv("K8S_NAMESPACE_WHITELIST")
 	if namespaces != "" {
 		k8sNameSpace = strings.Split(namespaces, ",")
 	}
@@ -132,7 +132,7 @@ func filterProcess(command string, cid string) bool {
 	// 针对 go应用程序 按照namespace过滤, 在监控的namespace下就不过滤
 	pods := cache.Querier.ListPod("")
 	for _, pod := range pods {
-		if util.Contains(k8sNameSpace, pod.NS()) && util.Contains(pod.ContainerIDs(), cid) {
+		if utils.Contains(k8sNameSpace, pod.NS()) && utils.Contains(pod.ContainerIDs(), cid) {
 			return false
 		}
 	}

@@ -4,7 +4,7 @@ go 1.21.5
 
 require (
 	github.com/Asphaltt/go-iproute2 v0.0.0-20220404100349-2854774d085e
-	github.com/CloudDetail/metadata v0.0.0-20240903055919-f0487c96aa95
+	github.com/CloudDetail/metadata v0.0.0-20241029081254-1242007177f3
 	github.com/mdlayher/netlink v1.7.2
 	github.com/prometheus/client_golang v1.19.1
 	github.com/shirou/gopsutil v3.21.11+incompatible
