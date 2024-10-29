@@ -1,14 +1,13 @@
-package main
+package metric
 
 import (
-	"fmt"
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
+	"github.com/CloudDetail/node-agent/config"
 	"github.com/CloudDetail/node-agent/netanaly"
 	"github.com/CloudDetail/node-agent/proc"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,79 +15,8 @@ import (
 	"k8s.io/utils/lru"
 )
 
-var (
-	counterLabel    *lru.Cache
-	packetLossCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "originx_packet_loss_count",
-			Help: "Network packet loss count",
-		},
-		[]string{
-			"src_ip",
-			"dst_ip",
-			"pid",
-			"level",
-			"src_pod",
-			"src_namespace",
-			"src_node",
-			"dst_pod",
-			"dst_namespace",
-			"dst_node",
-			"node_name",
-			"node_ip",
-			"container_id",
-		},
-	)
-	networkRTT = prometheus.NewDesc(
-		"kindling_network_rtt",
-		"Network Round-Trip Time (RTT)",
-		[]string{
-			"src_ip",
-			"dst_ip",
-			"pid",
-			"level",
-			"src_pod",
-			"src_namespace",
-			"src_node",
-			"dst_pod",
-			"dst_namespace",
-			"dst_node",
-			"node_name",
-			"node_ip",
-			"container_id",
-		},
-		nil,
-	)
-	processStartTime = prometheus.NewDesc(
-		"originx_process_start_time",
-		"Process Start Time (Unix Timestamp)",
-		[]string{
-			"pid",
-			"node_name",
-			"node_ip",
-			"container_id",
-		},
-		nil,
-	)
-)
-
-var processTime = false
-var nodeName = ""
-var nodeIp = ""
-var cacheSize = 50000
-
 func init() {
-	if os.Getenv("PROCESS_TIME") == "true" {
-		processTime = true
-	}
-	nodeName = os.Getenv("MY_NODE_NAME")
-	nodeIp = os.Getenv("MY_NODE_IP")
-	envVar := os.Getenv("LRU_CACHE_SIZE")
-	if value, err := strconv.Atoi(envVar); err == nil {
-		cacheSize = value
-	}
-
-	counterLabel = lru.NewWithEvictionFunc(cacheSize, func(key lru.Key, value interface{}) {
+	counterLabel = lru.NewWithEvictionFunc(config.GlobalCfg.LRUCacheSize, func(key lru.Key, value interface{}) {
 		labelstr := key.(string)
 		labels := strings.Split(labelstr, ":")
 		packetLossCount.DeleteLabelValues(labels...)
@@ -113,16 +41,17 @@ func (rc *RttCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
+	cfg := config.GlobalCfg
 	pid2cid := make(map[uint32]string)
-	if processTime {
+	if cfg.ProcessTime {
 		proc.GlobalPidMutex.RLock()
 		for pid, processInfo := range proc.GlobalNeedMonitorPid {
 			ch <- prometheus.MustNewConstMetric(
 				processStartTime, prometheus.GaugeValue,
 				float64(processInfo.StartTime.Unix()),
 				strconv.FormatUint(uint64(pid), 10),
-				nodeName,
-				nodeIp,
+				cfg.NodeName,
+				cfg.NodeIP,
 				processInfo.ContainId,
 			)
 			pid2cid[pid] = processInfo.ContainId
@@ -152,7 +81,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 						tuple.SrcIp, tuple.ServiceIp, pid, "service",
 						srcPod, srcNamespace, srcNode,
 						"", "", "",
-						nodeName, nodeIp, containerId,
+						cfg.NodeName, cfg.NodeIP, containerId,
 					).Inc()
 					continue
 				}
@@ -160,7 +89,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 					tuple.SrcIp, tuple.ServiceIp, pid, "service",
 					srcPod, srcNamespace, srcNode,
 					"", "", "",
-					nodeName, nodeIp, containerId,
+					cfg.NodeName, cfg.NodeIP, containerId,
 				)
 			} else {
 				dstPod := ""
@@ -178,7 +107,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 						tuple.SrcIp, tuple.DstIp, pid, "instance",
 						srcPod, srcNamespace, srcNode,
 						dstPod, dstNamespace, dstNode,
-						nodeName, nodeIp, containerId,
+						cfg.NodeName, cfg.NodeIP, containerId,
 					).Inc()
 					continue
 				}
@@ -186,7 +115,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 					tuple.SrcIp, tuple.DstIp, pid, "instance",
 					srcPod, srcNamespace, srcNode,
 					dstPod, dstNamespace, dstNode,
-					nodeName, nodeIp, containerId,
+					cfg.NodeName, cfg.NodeIP, containerId,
 				)
 			}
 		}
@@ -195,43 +124,4 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	// 解锁 RttResultMapMutex
 	netanaly.RttResultMapMutex.Unlock()
-}
-
-func getOrCreateCounter(src_ip, dst_ip, pid, level,
-	src_pod, src_namespace, src_node,
-	dst_pod, dst_namespace, dst_node,
-	node_name, node_ip, container_id string,
-) prometheus.Counter {
-	key := fmt.Sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:%s",
-		src_ip, dst_ip, pid, level,
-		src_pod, src_namespace, src_node,
-		dst_pod, dst_namespace, dst_node,
-		node_name, node_ip, container_id)
-
-	if _, found := counterLabel.Get(key); !found {
-		counterLabel.Add(key, struct{}{})
-	}
-
-	return packetLossCount.WithLabelValues(
-		src_ip, dst_ip, pid, level,
-		src_pod, src_namespace, src_node,
-		dst_pod, dst_namespace, dst_node,
-		node_name, node_ip, container_id,
-	)
-}
-
-func createRttMetric(
-	value float64,
-	src_ip, dst_ip, pid, level,
-	src_pod, src_namespace, src_node,
-	dst_pod, dst_namespace, dst_node,
-	node_name, node_ip, container_id string,
-) prometheus.Metric {
-	return prometheus.MustNewConstMetric(
-		networkRTT, prometheus.GaugeValue, value,
-		src_ip, dst_ip, pid, level,
-		src_pod, src_namespace, src_node,
-		dst_pod, dst_namespace, dst_node,
-		node_name, node_ip, container_id,
-	)
 }
