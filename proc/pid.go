@@ -24,6 +24,10 @@ var invalidProcess = []string{
 	"sshd",
 	"kube-",
 	"etcd",
+	"/metrics-server",
+	"runsv",
+	"calico-node",
+	"/app/node-agent",
 }
 
 var UserHZ = 100
