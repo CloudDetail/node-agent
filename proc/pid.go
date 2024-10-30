@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CloudDetail/metadata/model/cache"
+	"github.com/CloudDetail/node-agent/config"
 	"github.com/CloudDetail/node-agent/utils"
 )
 
@@ -23,27 +24,13 @@ var invalidProcess = []string{
 	"sshd",
 }
 
-var processType = []string{}
-var k8sNameSpace = []string{}
 var UserHZ = 100
-
 var GlobalPidMutex = &sync.RWMutex{}
 var GlobalNeedMonitorPid = make(map[uint32]*ProcessInfo)
 
 type ProcessInfo struct {
 	StartTime time.Time
 	ContainId string
-}
-
-func init() {
-	types := os.Getenv("PROCESS_TYPE")
-	if types != "" {
-		processType = strings.Split(types, ",")
-	}
-	namespaces := os.Getenv("K8S_NAMESPACE_WHITELIST")
-	if namespaces != "" {
-		k8sNameSpace = strings.Split(namespaces, ",")
-	}
 }
 
 func GetPid() {
@@ -121,10 +108,11 @@ func filterProcess(command string, cid string) bool {
 			return true
 		}
 	}
-	if len(processType) == 0 {
+	cfg := config.GlobalCfg
+	if len(cfg.ProcessType) == 0 {
 		return false
 	}
-	for _, t := range processType {
+	for _, t := range cfg.ProcessType {
 		if strings.Contains(command, t) {
 			return false
 		}
@@ -132,7 +120,7 @@ func filterProcess(command string, cid string) bool {
 	// 针对 go应用程序 按照namespace过滤, 在监控的namespace下就不过滤
 	pods := cache.Querier.ListPod("")
 	for _, pod := range pods {
-		if utils.Contains(k8sNameSpace, pod.NS()) && utils.Contains(pod.ContainerIDs(), cid) {
+		if utils.Contains(cfg.K8SNameSpace, pod.NS()) && utils.Contains(pod.ContainerIDs(), cid) {
 			return false
 		}
 	}
