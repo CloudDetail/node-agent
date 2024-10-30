@@ -22,6 +22,8 @@ var invalidProcess = []string{
 	"/bin/sh",
 	"/bin/bash",
 	"sshd",
+	"kube-",
+	"etcd",
 }
 
 var UserHZ = 100
