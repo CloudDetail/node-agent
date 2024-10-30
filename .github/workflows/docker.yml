@@ -32,7 +32,15 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Generate App Version
-        run: echo APP_VERSION=$(git describe --tags --always) >> $GITHUB_ENV
+        run: |
+          TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+          if [ -n "$TAG" ]; then
+            echo "APP_VERSION=$TAG" >> $GITHUB_ENV
+          else
+            BRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's#[^a-zA-Z0-9._-]#-#g')
+            COMMIT=$(git rev-parse --short HEAD)
+            echo "APP_VERSION=${BRANCH}-${COMMIT}" >> $GITHUB_ENV
+          fi
 
       - name: Build and push
         id: docker_build

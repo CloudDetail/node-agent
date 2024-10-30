@@ -2,27 +2,27 @@ package netanaly
 
 import (
 	"log"
-	"os"
 	"sync"
 
 	"github.com/CloudDetail/metadata/configs"
 	"github.com/CloudDetail/metadata/model/cache"
 	"github.com/CloudDetail/metadata/source"
+	"github.com/CloudDetail/node-agent/config"
 	"github.com/CloudDetail/node-agent/nettool"
 	"github.com/CloudDetail/node-agent/proc"
 	"github.com/shirou/gopsutil/net"
 	"github.com/vishvananda/netns"
 )
 
-func InitMetaData() {
+func init() {
 	cfg := &configs.MetaSourceConfig{
 		Querier: &configs.QuerierConfig{
 			IsSingleCluster: true,
 		},
 	}
-	kubeAuth := os.Getenv("AUTH_TYPE")
+	kubeAuth := config.GlobalCfg.AuthType
 	if len(kubeAuth) > 0 {
-		kubeConfig := os.Getenv("KUBE_CONFIG")
+		kubeConfig := config.GlobalCfg.KubeConfig
 		cfg.KubeSource = &configs.KubeSourceConfig{
 			KubeAuthType:      kubeAuth,
 			KubeAuthConfig:    kubeConfig,
@@ -30,7 +30,7 @@ func InitMetaData() {
 		}
 	}
 
-	sourceAddr := os.Getenv("FETCH_SOURCE_ADDR")
+	sourceAddr := config.GlobalCfg.FetchSourceAddr
 	if len(sourceAddr) > 0 {
 		cfg.FetchSource = &configs.FetchSourceConfig{
 			SourceAddr:   sourceAddr,
@@ -43,12 +43,14 @@ func InitMetaData() {
 		log.Println("kubernetes info fetch disable")
 		return
 	}
-	meta := source.CreateMetaSourceFromConfig(cfg)
+	go func() {
+		meta := source.CreateMetaSourceFromConfig(cfg)
+		err := meta.Run()
+		if err != nil {
+			log.Printf("failed to get service meta from k8s: %s", err)
+		}
+	}()
 
-	err := meta.Run()
-	if err != nil {
-		log.Printf("failed to get service meta from k8s: %s", err)
-	}
 }
 
 func GetPodByIp(podIp string) (*cache.Pod, bool) {

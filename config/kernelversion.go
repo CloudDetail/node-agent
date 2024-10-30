@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"log"
@@ -7,9 +7,8 @@ import (
 	"strings"
 )
 
-var Kernel317 bool
-
-func KernelBlow317() {
+func KernelBlow317() bool {
+	var Kernel317 bool
 	cmd := exec.Command("uname", "-r")
 	output, err := cmd.Output()
 	if err != nil {
@@ -31,5 +30,6 @@ func KernelBlow317() {
 	}
 	log.Printf("kernel version: %s", kernelVersionText)
 	log.Printf("Kernel317: %s", strconv.FormatBool(Kernel317))
+	return Kernel317
 
 }
