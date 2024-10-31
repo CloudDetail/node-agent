@@ -123,6 +123,10 @@ func filterProcess(command string, cid string) bool {
 			return false
 		}
 	}
+
+	if len(cfg.K8SNameSpace) == 0 {
+		return false
+	}
 	// 针对 go应用程序 按照namespace过滤, 在监控的namespace下就不过滤
 	pods := cache.Querier.ListPod("")
 	for _, pod := range pods {
