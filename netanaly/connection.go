@@ -90,6 +90,7 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 		for _, conn := range connets {
 			if conn.Status == "ESTABLISHED" {
 				AddPing(conn.Laddr.IP, conn.Raddr.IP, pid, rttMap)
+				middleware.AddMiddlewareNetwork(conn.Raddr.IP, pid, uint16(conn.Raddr.Port), middleNet)
 			}
 		}
 		return

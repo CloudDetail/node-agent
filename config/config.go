@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -65,7 +66,7 @@ var GlobalCfg = newConfig()
 
 func newConfig() *Config {
 	cfg := &Config{}
-	data, err := os.ReadFile("config.yaml")
+	data, err := os.ReadFile("./config.yaml")
 	if err != nil {
 		log.Fatalf("read config.yaml failed: %v", err)
 		return cfg
@@ -75,5 +76,6 @@ func newConfig() *Config {
 		log.Fatalf("unmarshal config.yaml failed: %v", err)
 	}
 	cfg.checkAndSetDefault()
+	fmt.Println(cfg)
 	return cfg
 }
