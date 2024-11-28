@@ -27,6 +27,7 @@ var middlewareConnect = prometheus.NewDesc(
 		"peer_type",
 		"service_ip",
 		"service_port",
+		"connect_type",
 	},
 	nil,
 )
@@ -36,10 +37,20 @@ func createMiddlewareMetric(
 	peer_ip, peer_port, peer_type,
 	service_ip, service_port string,
 ) prometheus.Metric {
-	return prometheus.MustNewConstMetric(
-		middlewareConnect, prometheus.GaugeValue, 1,
-		pid, container_id, node_name, node_ip,
-		peer_ip, peer_port, peer_type,
-		service_ip, service_port,
-	)
+	if service_ip == "" {
+		return prometheus.MustNewConstMetric(
+			middlewareConnect, prometheus.GaugeValue, 1,
+			pid, container_id, node_name, node_ip,
+			peer_ip, peer_port, peer_type,
+			"", "", "k8s-service",
+		)
+	} else {
+		return prometheus.MustNewConstMetric(
+			middlewareConnect, prometheus.GaugeValue, 1,
+			pid, container_id, node_name, node_ip,
+			peer_ip, peer_port, peer_type,
+			service_ip, service_port, "direct",
+		)
+	}
+
 }
