@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/CloudDetail/node-agent/config"
+	"github.com/CloudDetail/node-agent/middleware"
 	"github.com/CloudDetail/node-agent/netanaly"
 	"github.com/CloudDetail/node-agent/proc"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,7 +17,7 @@ import (
 )
 
 func init() {
-	counterLabel = lru.NewWithEvictionFunc(config.GlobalCfg.LRUCacheSize, func(key lru.Key, value interface{}) {
+	counterLabel = lru.NewWithEvictionFunc(config.GlobalCfg.Metric.LRUCacheSize, func(key lru.Key, value interface{}) {
 		labelstr := key.(string)
 		labels := strings.Split(labelstr, ":")
 		packetLossCount.DeleteLabelValues(labels...)
@@ -43,7 +44,7 @@ func (rc *RttCollector) Describe(ch chan<- *prometheus.Desc) {
 func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 	cfg := config.GlobalCfg
 	pid2cid := make(map[uint32]string)
-	if cfg.ProcessTime {
+	if cfg.Metric.ProcessTime {
 		proc.GlobalPidMutex.RLock()
 		for pid, processInfo := range proc.GlobalNeedMonitorPid {
 			ch <- prometheus.MustNewConstMetric(
@@ -58,6 +59,18 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		proc.GlobalPidMutex.RUnlock()
 	}
+	middleware.MiddlewareInstance.Mu.Lock()
+	for pid, conn := range middleware.MiddlewareInstance.Pid2Connect {
+		for _, info := range conn {
+			ch <- createMiddlewareMetric(
+				strconv.FormatUint(uint64(pid), 10), pid2cid[pid],
+				cfg.NodeName, cfg.NodeIP,
+				info.PeerIp, strconv.Itoa(int(info.PeerPort)), info.PeerType.String(),
+				info.ServiceIp, strconv.Itoa(int(info.ServicePort)),
+			)
+		}
+	}
+	middleware.MiddlewareInstance.Mu.Unlock()
 
 	netanaly.RttResultMapMutex.Lock()
 	for tuple, statistic := range netanaly.GlobalRttResultMap {

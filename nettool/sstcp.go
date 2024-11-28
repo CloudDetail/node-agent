@@ -11,6 +11,7 @@ import (
 type Tuple struct {
 	SrcIp     string
 	DstIp     string
+	DstPort   uint16
 	ServiceIp string
 }
 
@@ -76,6 +77,7 @@ func (c *Client) listSockets(req *iproute2.InetDiagReq) ([]*Tuple, error) {
 			e.SrcIp = net.IP(diagMsg.Saddr[:]).String()
 			e.DstIp = net.IP(diagMsg.Daddr[:]).String()
 		}
+		e.DstPort = diagMsg.Dport
 
 		data = data[iproute2.SizeofInetDiagMsg:]
 		ad, err := netlink.NewAttributeDecoder(data)

@@ -1,0 +1,23 @@
+metric:
+  ping_span: 5
+  pid_span: 1
+  lru_cache_size: 50000
+  process_time: true
+
+whitelist:
+  process_type: [java,python,node]
+  k8s_namespace: [go-auto,default]
+
+k8s_metadata:
+  fetch_source_addr: http://127.0.0.1:8080
+  auth_type:
+  kube_config:
+
+middleware_port:
+  rabbitmq: [5672]
+  kafka: [9092]
+  activemq: [61616]
+  rocketmq: [10911]
+  mysql: [3306]
+  postgresql: [5432]
+  mongodb: [27017]
