@@ -42,14 +42,14 @@ func createMiddlewareMetric(
 			middlewareConnect, prometheus.GaugeValue, 1,
 			pid, container_id, node_name, node_ip,
 			peer_ip, peer_port, peer_type,
-			"", "", "k8s-service",
+			"", "", "direct",
 		)
 	} else {
 		return prometheus.MustNewConstMetric(
 			middlewareConnect, prometheus.GaugeValue, 1,
 			pid, container_id, node_name, node_ip,
 			peer_ip, peer_port, peer_type,
-			service_ip, service_port, "direct",
+			service_ip, service_port, "k8s-service",
 		)
 	}
 
