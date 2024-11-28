@@ -49,9 +49,9 @@ type WhiteListConfig struct {
 }
 
 type K8SMetaDataConfig struct {
-	FetchSourceAddr string
-	AuthType        string
-	KubeConfig      string
+	FetchSourceAddr string `yaml:"fetch_source_addr"`
+	AuthType        string `yaml:"auth_type"`
+	KubeConfig      string `yaml:"kube_config"`
 }
 
 func (c *Config) checkAndSetDefault() {
