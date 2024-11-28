@@ -1,20 +1,20 @@
-metric:
-  ping_span: 5
-  pid_span: 1
-  lru_cache_size: 50000
-  process_time: true
+metric: 
+  ping_span: 5 # get network rtt every 5s
+  pid_span: 1 # get process info every 1min
+  lru_cache_size: 50000 # metric cache size
+  process_time: true # enable collector process time metric
 
 whitelist:
-  process_type: [java,python,node]
-  k8s_namespace: [go-auto,default]
+  process_type: [java,python,node] # match process cmdline, if not config match all
+  k8s_namespace: [go-auto,default] # match k8s namespace, if not config match all
 
 k8s_metadata:
-  fetch_source_addr: http://127.0.0.1:8080
-  auth_type:
-  kube_config:
+  fetch_source_addr: http://127.0.0.1:8080 # metadata fetch source addr
+  auth_type: # kube_auth_type, support kubeConfig
+  kube_config: # kube_auth_config, kubeConfig file path, only used when kube_auth_type is kubeConfig
 
-middleware_port:
-  rabbitmq: [5672]
+middleware_port: # match middleware port
+  rabbitmq: [5672] 
   kafka: [9092]
   activemq: [61616]
   rocketmq: [10911]
