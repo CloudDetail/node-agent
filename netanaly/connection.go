@@ -8,6 +8,7 @@ import (
 	"github.com/CloudDetail/metadata/model/cache"
 	"github.com/CloudDetail/metadata/source"
 	"github.com/CloudDetail/node-agent/config"
+	"github.com/CloudDetail/node-agent/middleware"
 	"github.com/CloudDetail/node-agent/nettool"
 	"github.com/CloudDetail/node-agent/proc"
 	"github.com/shirou/gopsutil/net"
@@ -20,9 +21,9 @@ func init() {
 			IsSingleCluster: true,
 		},
 	}
-	kubeAuth := config.GlobalCfg.AuthType
+	kubeAuth := config.GlobalCfg.K8SMetaData.AuthType
 	if len(kubeAuth) > 0 {
-		kubeConfig := config.GlobalCfg.KubeConfig
+		kubeConfig := config.GlobalCfg.K8SMetaData.KubeConfig
 		cfg.KubeSource = &configs.KubeSourceConfig{
 			KubeAuthType:      kubeAuth,
 			KubeAuthConfig:    kubeConfig,
@@ -30,7 +31,7 @@ func init() {
 		}
 	}
 
-	sourceAddr := config.GlobalCfg.FetchSourceAddr
+	sourceAddr := config.GlobalCfg.K8SMetaData.FetchSourceAddr
 	if len(sourceAddr) > 0 {
 		cfg.FetchSource = &configs.FetchSourceConfig{
 			SourceAddr:   sourceAddr,
@@ -72,7 +73,7 @@ var GlobalRttMap = make(map[string]map[string]Result)
 
 var GlobalRttMutex = &sync.RWMutex{}
 
-func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[string]Result) {
+func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[string]Result, middleNet map[uint32]map[string]middleware.MiddlewareInfo) {
 	ns, err := proc.GetNetNs(pid)
 	if err != nil {
 		log.Println(err)
@@ -89,6 +90,7 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 		for _, conn := range connets {
 			if conn.Status == "ESTABLISHED" {
 				AddPing(conn.Laddr.IP, conn.Raddr.IP, pid, rttMap)
+				middleware.AddMiddlewareNetwork(conn.Raddr.IP, pid, uint16(conn.Raddr.Port), middleNet)
 			}
 		}
 		return
@@ -101,9 +103,11 @@ func GetNeedPingsIp(pid uint32, selfNs netns.NsHandle, rttMap map[string]map[str
 		c.CloseConnection()
 		for _, tuple := range tuples4 {
 			AddPing(tuple.SrcIp, tuple.DstIp, pid, rttMap)
+			middleware.AddMiddlewareNetwork(tuple.DstIp, pid, tuple.DstPort, middleNet)
 		}
 		for _, tuple := range tuples6 {
 			AddPing(tuple.SrcIp, tuple.DstIp, pid, rttMap)
+			middleware.AddMiddlewareNetwork(tuple.DstIp, pid, tuple.DstPort, middleNet)
 		}
 		return nil
 	})

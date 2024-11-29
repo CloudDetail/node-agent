@@ -1,0 +1,40 @@
+metric: 
+  # Interval in seconds to measure network round-trip time (RTT).
+  ping_span: 5 
+  # Interval in minutes to collect process information.
+  pid_span: 1 
+  # Size of the Least Recently Used (LRU) cache for metric storage.
+  lru_cache_size: 50000 
+  # Enable the collection of process time metrics.
+  process_time: true
+
+whitelist:
+  # List of process types to match against command lines. Matches all if not specified.
+  process_type: [java, python, node]
+  # List of Kubernetes namespaces to match. Matches all if not specified.
+  k8s_namespace: [go-auto, default] 
+
+k8s_metadata:
+  # Address to fetch Kubernetes metadata from.
+  fetch_source_addr: http://127.0.0.1:8080
+  # Type of Kubernetes authentication. Supports 'kubeConfig'.
+  auth_type: 
+  # Path to the kubeConfig file, used only when 'auth_type' is set to 'kubeConfig'.
+  kube_config: 
+
+# Ports associated with specific middleware services.
+middleware_port:
+  # Default port for RabbitMQ.
+  rabbitmq: [5672]
+  # Default port for Kafka.
+  kafka: [9092]
+  # Default port for ActiveMQ.
+  activemq: [61616]
+  # Default port for RocketMQ.
+  rocketmq: [10911]
+  # Default port for MySQL.
+  mysql: [3306]
+  # Default port for PostgreSQL.
+  postgresql: [5432]
+  # Default port for MongoDB.
+  mongodb: [27017]

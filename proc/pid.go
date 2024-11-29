@@ -115,22 +115,22 @@ func filterProcess(command string, cid string) bool {
 		}
 	}
 	cfg := config.GlobalCfg
-	if len(cfg.ProcessType) == 0 {
+	if len(cfg.WhiteList.ProcessType) == 0 {
 		return false
 	}
-	for _, t := range cfg.ProcessType {
+	for _, t := range cfg.WhiteList.ProcessType {
 		if strings.Contains(command, t) {
 			return false
 		}
 	}
 
-	if len(cfg.K8SNameSpace) == 0 {
+	if len(cfg.WhiteList.K8SNameSpace) == 0 {
 		return false
 	}
 	// 针对 go应用程序 按照namespace过滤, 在监控的namespace下就不过滤
 	pods := cache.Querier.ListPod("")
 	for _, pod := range pods {
-		if utils.Contains(cfg.K8SNameSpace, pod.NS()) && utils.Contains(pod.ContainerIDs(), cid) {
+		if utils.Contains(cfg.WhiteList.K8SNameSpace, pod.NS()) && utils.Contains(pod.ContainerIDs(), cid) {
 			return false
 		}
 	}

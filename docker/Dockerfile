@@ -13,6 +13,7 @@ FROM debian:bullseye-slim AS runner
 
 WORKDIR /app
 COPY --from=builder /build/node-agent /app
+COPY config.yaml /app
 
 EXPOSE 9408
 CMD ["/app/node-agent"]

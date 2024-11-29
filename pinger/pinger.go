@@ -13,7 +13,7 @@ import (
 )
 
 func Ping(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(config.GlobalCfg.PingSpan) * time.Second)
+	ticker := time.NewTicker(time.Duration(config.GlobalCfg.Metric.PingSpan) * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
