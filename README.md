@@ -1,14 +1,14 @@
 # node-agent
 
-node-agent 用于导出应用和下游依赖的网络指标和应用程序启动时间指标
+A monitoring agent that exports network metrics for applications and their downstream dependencies, as well as application startup time metrics.
 
-## 构建
+## Build
 
 ```bash
 docker build -t node-agent:latest -f ./docker/Dockerfile .
 ```
 
-## 部署
+## Deploy
 
 ```bash
 docker run -d --rm \
@@ -19,9 +19,10 @@ docker run -d --rm \
   node-agent:latest
 ```
 
-## 配置环境变量
+## Configuration
 
-- MY_NODE_NAME: 节点名称
-- MY_NODE_IP: 节点IP
+Environment Variables:
+- MY_NODE_NAME: Name of the node
+- MY_NODE_IP: IP address of the node
 
-其他配置参数参考 `config.yaml`文件
+For additional configuration options, please refer to the `config.yaml` file.
