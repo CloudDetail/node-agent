@@ -64,6 +64,8 @@ func UpdatePid() {
 	for pid := range newSet {
 		if _, ok := GlobalNeedMonitorPid[pid]; !ok {
 			GlobalNeedMonitorPid[pid] = pids[pid]
+		} else {
+			GlobalNeedMonitorPid[pid].LastSeen = pids[pid].LastSeen
 		}
 	}
 	GlobalPidMutex.Unlock()
