@@ -14,6 +14,18 @@ var processStartTime = prometheus.NewDesc(
 	nil,
 )
 
+var processLastSeen = prometheus.NewDesc(
+	"originx_process_last_seen",
+	"Unix timestamp when the process was last detected.",
+	[]string{
+		"pid",
+		"node_name",
+		"node_ip",
+		"container_id",
+	},
+	nil,
+)
+
 var middlewareConnect = prometheus.NewDesc(
 	"apo_network_middleware_connect",
 	"Middleware Connect",

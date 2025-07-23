@@ -25,6 +25,7 @@ func getCommand(pid uint32) string {
 	}
 	return strings.Replace(string(cmdline), "\x00", " ", -1)
 }
+
 func getContainerId(pid uint32) string {
 	data, err := os.ReadFile(Path(pid, "cgroup"))
 	if err != nil {
@@ -54,6 +55,7 @@ func getContainerId(pid uint32) string {
 	}
 	return ""
 }
+
 func getProcessStartTime(pid uint32) (*time.Time, error) {
 	data, err := os.ReadFile(Path(pid, "stat"))
 	if err != nil {

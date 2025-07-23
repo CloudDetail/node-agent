@@ -24,10 +24,11 @@ type Config struct {
 }
 
 type MetricConfig struct {
-	PingSpan     int  `yaml:"ping_span"`
-	PidSpan      int  `yaml:"pid_span"`
-	LRUCacheSize int  `yaml:"lru_cache_size"`
-	ProcessTime  bool `yaml:"process_time"`
+	PingSpan             int  `yaml:"ping_span"`
+	PidSpan              int  `yaml:"pid_span"`
+	LRUCacheSize         int  `yaml:"lru_cache_size"`
+	ProcessTime          bool `yaml:"process_time"`
+	ScrapProcessLastSeen bool `yaml:"scrap_process_last_seen"`
 }
 
 func (m *MetricConfig) setDefault() {
