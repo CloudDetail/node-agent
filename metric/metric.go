@@ -65,7 +65,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 		for pid, processInfo := range proc.GlobalNeedMonitorPid {
 			// TODO Check network traffic
 			ch <- prometheus.MustNewConstMetric(
-				processStartTime, prometheus.GaugeValue,
+				processLastSeen, prometheus.GaugeValue,
 				float64(processInfo.LastSeen.Unix()),
 				strconv.FormatUint(uint64(pid), 10),
 				cfg.NodeName,
