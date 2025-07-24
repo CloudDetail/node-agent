@@ -22,6 +22,7 @@ var processLastSeen = prometheus.NewDesc(
 		"node_name",
 		"node_ip",
 		"container_id",
+		"comm",
 	},
 	nil,
 )

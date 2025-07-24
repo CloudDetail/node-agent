@@ -26,6 +26,15 @@ func getCommand(pid uint32) string {
 	return strings.Replace(string(cmdline), "\x00", " ", -1)
 }
 
+func getComm(pid uint32) string {
+	comm, err := os.ReadFile(Path(pid, "comm"))
+	if err != nil {
+		return ""
+	}
+
+	return string(comm)
+}
+
 func getContainerId(pid uint32) string {
 	data, err := os.ReadFile(Path(pid, "cgroup"))
 	if err != nil {

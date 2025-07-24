@@ -71,6 +71,7 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 				cfg.NodeName,
 				cfg.NodeIP,
 				processInfo.ContainId,
+				processInfo.Comm,
 			)
 			pid2cid[pid] = processInfo.ContainId
 		}

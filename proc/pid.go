@@ -38,6 +38,7 @@ type ProcessInfo struct {
 	StartTime time.Time
 	ContainId string
 	LastSeen  time.Time
+	Comm      string
 }
 
 func GetPid() {
@@ -102,10 +103,12 @@ func listPids() map[uint32]*ProcessInfo {
 		if err != nil {
 			continue
 		}
+		comm := getComm(uint32(pid))
 		pids[intpid] = &ProcessInfo{
 			StartTime: *startTime,
 			ContainId: cid,
 			LastSeen:  time.Now(),
+			Comm:      comm,
 		}
 	}
 	return pids
