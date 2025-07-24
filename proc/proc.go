@@ -32,7 +32,7 @@ func getComm(pid uint32) string {
 		return ""
 	}
 
-	return string(comm)
+	return strings.TrimRight(string(comm), "\n\r ")
 }
 
 func getContainerId(pid uint32) string {
