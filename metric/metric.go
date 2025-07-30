@@ -54,11 +54,31 @@ func (rc *RttCollector) Collect(ch chan<- prometheus.Metric) {
 				cfg.NodeName,
 				cfg.NodeIP,
 				processInfo.ContainId,
+				processInfo.Comm,
 			)
 			pid2cid[pid] = processInfo.ContainId
 		}
 		proc.GlobalPidMutex.RUnlock()
 	}
+
+	if cfg.Metric.ScrapProcessLastSeen {
+		proc.GlobalPidMutex.RLock()
+		for pid, processInfo := range proc.GlobalNeedMonitorPid {
+			// TODO Check network traffic
+			ch <- prometheus.MustNewConstMetric(
+				processLastSeen, prometheus.GaugeValue,
+				float64(processInfo.LastSeen.Unix()),
+				strconv.FormatUint(uint64(pid), 10),
+				cfg.NodeName,
+				cfg.NodeIP,
+				processInfo.ContainId,
+				processInfo.Comm,
+			)
+			pid2cid[pid] = processInfo.ContainId
+		}
+		proc.GlobalPidMutex.RUnlock()
+	}
+
 	middleware.MiddlewareInstance.Mu.Lock()
 	for pid, conn := range middleware.MiddlewareInstance.Pid2Connect {
 		for _, info := range conn {

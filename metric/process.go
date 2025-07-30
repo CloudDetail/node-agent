@@ -10,6 +10,20 @@ var processStartTime = prometheus.NewDesc(
 		"node_name",
 		"node_ip",
 		"container_id",
+		"comm",
+	},
+	nil,
+)
+
+var processLastSeen = prometheus.NewDesc(
+	"originx_process_last_seen",
+	"Unix timestamp when the process was last detected.",
+	[]string{
+		"pid",
+		"node_name",
+		"node_ip",
+		"container_id",
+		"comm",
 	},
 	nil,
 )
