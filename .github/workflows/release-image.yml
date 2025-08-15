@@ -53,7 +53,7 @@ jobs:
         run: |
           echo "IMAGE_TAG_NAME=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
           echo "NODE_AGENT_IMAGE_FULL_TAG=${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}/${{ env.NODE_AGENT_CONTAINER_NAME }}:${{ github.event.inputs.tag }}" >> $GITHUB_ENV
-          echo "NODE_AGENT_IMAGE_FULL_TAG_ARM=${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME_ARM }}/${{ env.NODE_AGENT_CONTAINER_NAME }}:${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          echo "NODE_AGENT_IMAGE_FULL_TAG_ARM=${{ env.REGISTRY_HOST }}/${{ env.REGISTRY_USERNAME_ARM }}/${{ env.NODE_AGENT_CONTAINER_NAME }}:${{ github.event.inputs.tag }}" >> $GITHUB_ENV
 
       - name: Build node-agent docker image and push
         run: |
