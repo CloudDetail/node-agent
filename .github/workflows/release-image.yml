@@ -60,10 +60,11 @@ jobs:
           make docker-build ORG="${{ env.REGISTRY_HOST }}/${{ secrets.REGISTRY_USERNAME }}" TAG="${{ github.event.inputs.tag }}"
           docker push ${{ env.NODE_AGENT_IMAGE_FULL_TAG }}
 
-      - name: Build and push node-agent (ARM64)
+      - name: Build node-agent docker image and push(ARM64)
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./docker/Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ env.NODE_AGENT_IMAGE_FULL_TAG_ARM }}
