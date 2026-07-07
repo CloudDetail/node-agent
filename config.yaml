@@ -7,6 +7,8 @@ metric:
   lru_cache_size: 50000 
   # Enable the collection of process time metrics.
   process_time: true
+  # Port for the Prometheus metrics HTTP server.
+  prometheus_port: 9408
 
 whitelist:
   # List of process types to match against command lines. Matches all if not specified.

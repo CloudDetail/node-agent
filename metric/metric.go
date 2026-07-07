@@ -28,8 +28,9 @@ func init() {
 	prometheus.MustRegister(packetLossCount)
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
-		log.Println("Prometheus metrics server started on :9408")
-		http.ListenAndServe(":9408", nil)
+		listenAddr := config.GlobalCfg.Metric.PrometheusListenAddr()
+		log.Printf("Prometheus metrics server started on %s", listenAddr)
+		http.ListenAndServe(listenAddr, nil)
 	}()
 }
 

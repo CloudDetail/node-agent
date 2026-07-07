@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v2"
 )
@@ -24,10 +25,11 @@ type Config struct {
 }
 
 type MetricConfig struct {
-	PingSpan     int  `yaml:"ping_span"`
-	PidSpan      int  `yaml:"pid_span"`
-	LRUCacheSize int  `yaml:"lru_cache_size"`
-	ProcessTime  bool `yaml:"process_time"`
+	PingSpan       int    `yaml:"ping_span"`
+	PidSpan        int    `yaml:"pid_span"`
+	LRUCacheSize   int    `yaml:"lru_cache_size"`
+	ProcessTime    bool   `yaml:"process_time"`
+	PrometheusPort uint16 `yaml:"prometheus_port"`
 }
 
 func (m *MetricConfig) setDefault() {
@@ -40,7 +42,14 @@ func (m *MetricConfig) setDefault() {
 	if m.LRUCacheSize == 0 {
 		m.LRUCacheSize = 50000
 	}
+	if m.PrometheusPort == 0 {
+		m.PrometheusPort = 9408
+	}
 	m.ProcessTime = true
+}
+
+func (m MetricConfig) PrometheusListenAddr() string {
+	return ":" + strconv.Itoa(int(m.PrometheusPort))
 }
 
 type WhiteListConfig struct {
@@ -66,7 +75,7 @@ var GlobalCfg = newConfig()
 
 func newConfig() *Config {
 	cfg := &Config{}
-	data, err := os.ReadFile("./config.yaml")
+	data, err := readConfigFile()
 	if err != nil {
 		log.Fatalf("read config.yaml failed: %v", err)
 		return cfg
@@ -78,4 +87,17 @@ func newConfig() *Config {
 	cfg.checkAndSetDefault()
 	fmt.Println(cfg)
 	return cfg
+}
+
+func readConfigFile() ([]byte, error) {
+	data, err := os.ReadFile("./config.yaml")
+	if err == nil || !os.IsNotExist(err) {
+		return data, err
+	}
+
+	parentData, parentErr := os.ReadFile("../config.yaml")
+	if parentErr == nil {
+		return parentData, nil
+	}
+	return nil, err
 }
